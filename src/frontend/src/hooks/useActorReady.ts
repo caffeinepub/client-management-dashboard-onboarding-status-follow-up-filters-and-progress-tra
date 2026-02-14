@@ -12,10 +12,10 @@ export function useActorReady() {
 
   useEffect(() => {
     if (actor && !isFetching) {
-      // Delay actorReady signal to next tick to allow invalidation to complete
+      // Small delay to allow invalidation to complete before queries mount
       const timer = setTimeout(() => {
         setActorReady(true);
-      }, 0);
+      }, 50); // Increased from 0 to 50ms for better stability
       return () => clearTimeout(timer);
     } else {
       setActorReady(false);

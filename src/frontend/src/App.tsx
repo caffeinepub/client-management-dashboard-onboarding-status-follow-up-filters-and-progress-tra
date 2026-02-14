@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
 import { useGetAppInitData } from './hooks/useQueries';
+import { useStableActorConnection } from './hooks/useStableActorConnection';
 import { LoginGate } from './components/auth/LoginGate';
 import { ProfileSetupDialog } from './components/auth/ProfileSetupDialog';
 import { AppLayout } from './components/layout/AppLayout';
@@ -21,6 +22,7 @@ const ClientProfilePage = lazy(() => import('./pages/ClientProfilePage').then(m 
 
 function App() {
   const { identity } = useInternetIdentity();
+  const { isConnecting, isReady: connectionReady } = useStableActorConnection();
   const { data: initData, isLoading: initLoading, isError, error, refetch } = useGetAppInitData();
   const { currentRoute } = useRouter();
 
@@ -28,6 +30,19 @@ function App() {
 
   if (!isAuthenticated) {
     return <LoginGate />;
+  }
+
+  // Show connecting state until backend is confirmed ready
+  if (isConnecting || !connectionReady) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-lg font-medium text-foreground">Connecting...</p>
+          <p className="text-sm text-muted-foreground mt-2">Establishing connection to backend</p>
+        </div>
+      </div>
+    );
   }
 
   // Show profile setup if user has no profile

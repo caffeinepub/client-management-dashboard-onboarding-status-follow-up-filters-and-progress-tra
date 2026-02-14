@@ -1,11 +1,12 @@
 import { Suspense, lazy, useState } from 'react';
 import { useRouter } from '../hooks/useRouter';
-import { useGetClient, useGetClientProgress, useActivateClient, usePauseClient, useRenewSubscription, useExpireMembershipImmediately } from '../hooks/useQueries';
+import { useGetClient, useGetClientProgress, useActivateClient, usePauseClient, useResumeClient, useRenewSubscription, useExpireMembership, useConvertToFullOnboarding, useRecordFollowUp } from '../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Phone, Calendar, FileText, Download, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Phone, FileText, Download } from 'lucide-react';
 import { ClientStatusBadge } from '../components/clients/ClientStatusBadge';
+import { ClientPrimaryActionsCard } from '../components/clients/ClientPrimaryActionsCard';
 import { ActivateClientDialog } from '../components/clients/ActivateClientDialog';
 import { PauseClientDialog } from '../components/clients/PauseClientDialog';
 import { RenewSubscriptionDialog } from '../components/clients/RenewSubscriptionDialog';
@@ -13,6 +14,7 @@ import { SubscriptionsSection } from '../components/clients/SubscriptionsSection
 import { ProgressEntryForm } from '../components/progress/ProgressEntryForm';
 import { ProgressHistoryTable } from '../components/progress/ProgressHistoryTable';
 import { FollowUpSection } from '../components/clients/FollowUpSection';
+import { FollowUpPromptDialog } from '../components/clients/FollowUpPromptDialog';
 import { getDisplayStatus, isClientActivated } from '../utils/status';
 import { formatDate } from '../utils/format';
 import { formatClientCode } from '../utils/clientCode';
@@ -48,11 +50,15 @@ export function ClientProfilePage() {
   const [showPauseDialog, setShowPauseDialog] = useState(false);
   const [showRenewDialog, setShowRenewDialog] = useState(false);
   const [showExpireDialog, setShowExpireDialog] = useState(false);
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   
   const activateClient = useActivateClient();
   const pauseClient = usePauseClient();
+  const resumeClient = useResumeClient();
   const renewSubscription = useRenewSubscription();
-  const expireMembership = useExpireMembershipImmediately();
+  const expireMembership = useExpireMembership();
+  const convertToFullOnboarding = useConvertToFullOnboarding();
+  const recordFollowUp = useRecordFollowUp();
 
   const handleActivate = async (startDate: Date, followUpDay: FollowUpDay) => {
     if (!client) return;
@@ -78,14 +84,26 @@ export function ClientProfilePage() {
     try {
       await pauseClient.mutateAsync({
         clientCode: client.code,
-        pauseDurationDays: durationDays,
-        pauseReason: reason,
+        durationDays: BigInt(durationDays),
+        reason,
       });
       toast.success('Client paused successfully!');
       setShowPauseDialog(false);
     } catch (error) {
       toast.error(normalizeError(error));
       console.error('Pause error:', error);
+    }
+  };
+
+  const handleResume = async () => {
+    if (!client) return;
+    
+    try {
+      await resumeClient.mutateAsync(client.code);
+      toast.success('Client resumed successfully!');
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Resume error:', error);
     }
   };
 
@@ -118,6 +136,40 @@ export function ClientProfilePage() {
     } catch (error) {
       toast.error(normalizeError(error));
       console.error('Expire membership error:', error);
+    }
+  };
+
+  const handleConvertToFull = async () => {
+    if (!client) return;
+    
+    try {
+      await convertToFullOnboarding.mutateAsync(client.code);
+      toast.success('Client converted to full onboarding successfully!');
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Convert to full onboarding error:', error);
+    }
+  };
+
+  const handleMarkFollowUpDone = () => {
+    setShowFollowUpDialog(true);
+  };
+
+  const handleFollowUpSubmit = async (done: boolean, notes: string) => {
+    if (!client || !client.followUpDay) return;
+    
+    try {
+      await recordFollowUp.mutateAsync({
+        clientCode: client.code,
+        followUpDay: client.followUpDay,
+        done,
+        notes,
+      });
+      toast.success('Follow-up recorded successfully!');
+      setShowFollowUpDialog(false);
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Record follow-up error:', error);
     }
   };
 
@@ -173,6 +225,7 @@ export function ClientProfilePage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
+        {/* Contact Information - Always visible */}
         <Card>
           <CardHeader>
             <CardTitle>Contact Information</CardTitle>
@@ -182,15 +235,14 @@ export function ClientProfilePage() {
               <Phone className="h-4 w-4 text-muted-foreground" />
               <span>{client.mobileNumber}</span>
             </div>
-            {client.notes && (
-              <div className="flex items-start gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
-                <span className="text-sm">{client.notes}</span>
-              </div>
-            )}
+            <div className="flex items-start gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <span className="text-sm">{client.notes || '—'}</span>
+            </div>
           </CardContent>
         </Card>
 
+        {/* Plan Details - Always visible with placeholders */}
         <Card>
           <CardHeader>
             <CardTitle>Plan Details</CardTitle>
@@ -216,40 +268,43 @@ export function ClientProfilePage() {
                 </div>
               </>
             ) : (
-              <p className="text-muted-foreground text-sm">No active subscription</p>
-            )}
-            {!activated && (
-              <div className="pt-2">
-                <Button onClick={() => setShowActivateDialog(true)} className="w-full">
-                  Activate Client
-                </Button>
-              </div>
-            )}
-            {activated && (
-              <div className="pt-2 space-y-2">
-                {client.status === 'active' && (
-                  <Button onClick={() => setShowPauseDialog(true)} variant="outline" className="w-full">
-                    Pause Client
-                  </Button>
-                )}
-                <Button onClick={() => setShowRenewDialog(true)} variant="default" className="w-full">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Renew Subscription
-                </Button>
-                <Button 
-                  onClick={() => setShowExpireDialog(true)} 
-                  variant="destructive" 
-                  className="w-full"
-                >
-                  <AlertTriangle className="mr-2 h-4 w-4" />
-                  Expire Membership
-                </Button>
-              </div>
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Plan Duration:</span>
+                  <span className="font-medium">—</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Start Date:</span>
+                  <span className="font-medium">—</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">End Date:</span>
+                  <span className="font-medium">—</span>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Primary Actions Card - Always visible with consistent structure */}
+      <ClientPrimaryActionsCard
+        client={client}
+        onActivate={() => setShowActivateDialog(true)}
+        onPause={() => setShowPauseDialog(true)}
+        onResume={handleResume}
+        onRenew={() => setShowRenewDialog(true)}
+        onExpire={() => setShowExpireDialog(true)}
+        onConvertToFull={handleConvertToFull}
+        isActivating={activateClient.isPending}
+        isPausing={pauseClient.isPending}
+        isResuming={resumeClient.isPending}
+        isRenewing={renewSubscription.isPending}
+        isExpiring={expireMembership.isPending}
+        isConverting={convertToFullOnboarding.isPending}
+      />
+
+      {/* Activated client sections */}
       {activated && (
         <>
           <SubscriptionsSection 
@@ -257,7 +312,11 @@ export function ClientProfilePage() {
             isLoading={clientLoading}
           />
 
-          <FollowUpSection client={client} />
+          <FollowUpSection 
+            client={client}
+            onMarkDone={handleMarkFollowUpDone}
+            isMarkingDone={recordFollowUp.isPending}
+          />
 
           <Tabs defaultValue="progress" className="space-y-4">
             <TabsList>
@@ -320,16 +379,7 @@ export function ClientProfilePage() {
         </>
       )}
 
-      {showExportDialog && (
-        <Suspense fallback={null}>
-          <ExportClientsExcelDialog
-            clients={[client]}
-            open={showExportDialog}
-            onOpenChange={setShowExportDialog}
-          />
-        </Suspense>
-      )}
-
+      {/* Dialogs */}
       <ActivateClientDialog
         open={showActivateDialog}
         onOpenChange={setShowActivateDialog}
@@ -354,25 +404,48 @@ export function ClientProfilePage() {
       <AlertDialog open={showExpireDialog} onOpenChange={setShowExpireDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Expire Membership Immediately?</AlertDialogTitle>
+            <AlertDialogTitle>Expire Membership</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will immediately expire the client's current membership. The subscription end date will be set to now, and the client status will change to "Expired". This is typically used in absconding cases.
-              <br /><br />
-              Are you sure you want to proceed?
+              Are you sure you want to expire this client's membership immediately? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={expireMembership.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleExpireMembership}
               disabled={expireMembership.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {expireMembership.isPending ? 'Expiring...' : 'Expire Membership'}
+              {expireMembership.isPending ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-destructive-foreground border-t-transparent" />
+                  Expiring...
+                </>
+              ) : (
+                'Expire Membership'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FollowUpPromptDialog
+        open={showFollowUpDialog}
+        onOpenChange={setShowFollowUpDialog}
+        onSubmit={handleFollowUpSubmit}
+        isLoading={recordFollowUp.isPending}
+        mode="manual"
+      />
+
+      {showExportDialog && (
+        <Suspense fallback={null}>
+          <ExportClientsExcelDialog
+            open={showExportDialog}
+            onOpenChange={setShowExportDialog}
+            clients={[client]}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

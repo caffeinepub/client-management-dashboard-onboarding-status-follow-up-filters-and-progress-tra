@@ -94,45 +94,63 @@ export function ClientsListPage() {
       return allSummaries.filter((c) => getClientStatus(c) === 'paused').length;
     }
     
-    if (filterType === 'half' || filterType === 'full') {
-      const onboardingState: OnboardingState = filterType === 'half' ? OnboardingStateEnum.half : OnboardingStateEnum.full;
-      return allSummaries.filter((c) => {
-        return c.onboardingState === onboardingState && !isClientActivated(c);
-      }).length;
+    if (filterType === 'half') {
+      return allSummaries.filter((c) => c.onboardingState === OnboardingStateEnum.half && !isClientActivated(c)).length;
     }
+    
+    if (filterType === 'full') {
+      return allSummaries.filter((c) => c.onboardingState === OnboardingStateEnum.full && !isClientActivated(c)).length;
+    }
+    
     return allSummaries.filter((c) => getClientStatus(c) === filterType).length;
   };
 
-  const handleExportClick = async () => {
-    if (!filteredSummaries || filteredSummaries.length === 0) {
+  const handleExport = async () => {
+    if (filteredSummaries.length === 0) {
       toast.error('No clients to export');
       return;
     }
 
     try {
-      // Prepare full client data for export
-      const clientCodes = filteredSummaries.map(s => s.code);
+      const clientCodes = filteredSummaries.map((c) => c.code);
       const fullClients = await prepareExport.mutateAsync(clientCodes);
       setExportClients(fullClients);
       setShowExportDialog(true);
     } catch (error) {
-      console.error('Export preparation error:', error);
+      console.error('Failed to prepare clients for export:', error);
       toast.error('Failed to prepare export data');
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="text-center space-y-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="text-muted-foreground">Loading clients...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
-        <p className="text-muted-foreground mt-1">Manage and track all your clients</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+          <p className="text-muted-foreground mt-1">Manage your fitness coaching clients</p>
+        </div>
+        <Button onClick={() => navigate('onboard')}>
+          <Users className="mr-2 h-4 w-4" />
+          Onboard New Client
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, code, or phone..."
+            placeholder="Search by name, code, or mobile number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -146,8 +164,8 @@ export function ClientsListPage() {
           />
           <Button
             variant="outline"
-            onClick={handleExportClick}
-            disabled={isLoading || !allSummaries || allSummaries.length === 0 || prepareExport.isPending}
+            onClick={handleExport}
+            disabled={prepareExport.isPending || filteredSummaries.length === 0}
           >
             {prepareExport.isPending ? (
               <>
@@ -157,39 +175,29 @@ export function ClientsListPage() {
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                Export to Excel
+                Export
               </>
             )}
           </Button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-center space-y-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-            <p className="text-muted-foreground">Loading clients...</p>
-          </div>
-        </div>
-      ) : filteredSummaries.length === 0 ? (
+      {filteredSummaries.length === 0 ? (
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-3">
-              <Users className="h-12 w-12 text-muted-foreground mx-auto" />
-              <div>
-                <h3 className="font-semibold text-lg">No clients found</h3>
-                <p className="text-muted-foreground text-sm">
-                  {searchQuery || filter !== 'all'
-                    ? 'Try adjusting your search or filter'
-                    : 'Get started by onboarding your first client'}
-                </p>
-              </div>
-              {!searchQuery && filter === 'all' && (
-                <Button onClick={() => navigate('onboard')} className="mt-4">
-                  Onboard Client
-                </Button>
-              )}
-            </div>
+          <CardContent className="py-12 text-center">
+            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No clients found</h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery.trim()
+                ? 'Try adjusting your search or filter criteria'
+                : 'Get started by onboarding your first client'}
+            </p>
+            {!searchQuery.trim() && (
+              <Button onClick={() => navigate('onboard')}>
+                <Users className="mr-2 h-4 w-4" />
+                Onboard New Client
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -197,17 +205,18 @@ export function ClientsListPage() {
           {filteredSummaries.map((client) => {
             const displayStatus = getDisplayStatus(client);
             const endDate = client.subscriptionSummary?.endDate;
+
             return (
               <Card
                 key={client.code.toString()}
-                className="hover:shadow-md transition-shadow cursor-pointer"
+                className="cursor-pointer transition-colors hover:bg-accent"
                 onClick={() => navigate(`client/${client.code.toString()}`)}
               >
                 <CardContent className="pt-6">
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <h3 className="font-semibold text-lg">{client.name}</h3>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg truncate">{client.name}</h3>
                         <p className="text-sm text-muted-foreground">
                           {formatClientCode(client.code.toString())}
                         </p>
@@ -217,15 +226,15 @@ export function ClientsListPage() {
 
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
+                        <Phone className="h-3.5 w-3.5" />
                         <span>{client.mobileNumber}</span>
                       </div>
-                      {endDate && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-4 w-4" />
-                          <span>Ends: {formatDate(endDate)}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>
+                          {endDate ? `Ends: ${formatDate(endDate)}` : 'Ends: —'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -240,12 +249,7 @@ export function ClientsListPage() {
           <ExportClientsExcelDialog
             clients={exportClients}
             open={showExportDialog}
-            onOpenChange={(open) => {
-              setShowExportDialog(open);
-              if (!open) {
-                setExportClients(null);
-              }
-            }}
+            onOpenChange={setShowExportDialog}
           />
         </Suspense>
       )}

@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-prevent-the-onboard-client-flow-from-submitting-any-backend-mutations-until-the-backend-actor-is-fully-ready-so-onboarding-never-surfaces-the-raw-error-text-actor-not-available-during-normal-loading-upgrade-windows",
-      "featureTitle": "Prevent the Onboard Client flow from submitting any backend mutations until the backend actor is fully ready, so onboarding never surfaces the raw error text \"Actor not available\" during normal loading/upgrade windows.",
+      "featureId": "feature-fix-the-frontend-backend-readiness-polling-so-it-does-not-continuously-reset-and-re-poll-due-to-state-changes-and-so-it-performs-bounded-exponential-backoff-until-readiness-is-confirmed",
+      "featureTitle": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
       "files": [
-        "frontend/src/hooks/useStableActorConnection.ts",
-        "frontend/src/pages/OnboardClientPage.tsx"
+        "frontend/src/hooks/useBackendReadiness.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -22,11 +21,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-update-the-onboarding-page-ui-to-handle-actor-readiness-explicitly-show-a-stable-non-flickering-loading-experience-and-avoid-transient-enable-disable-states-while-the-actor-is-being-created-invalidated",
-      "featureTitle": "Update the onboarding page UI to handle actor readiness explicitly: show a stable, non-flickering loading experience and avoid transient enable/disable states while the actor is being created/invalidated.",
+      "featureId": "feature-reduce-unnecessary-query-invalidation-refetch-storms-when-the-actor-is-created-changes-to-avoid-repeated-backend-calls-that-can-make-the-app-feel-like-it-is-re-connecting-on-every-interaction",
+      "featureTitle": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
       "files": [
-        "frontend/src/hooks/useStableActorConnection.ts",
-        "frontend/src/pages/OnboardClientPage.tsx"
+        "frontend/src/hooks/useActorReady.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -42,12 +40,13 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-harden-error-normalization-so-that-if-an-actor-not-ready-error-still-occurs-edge-cases-the-user-facing-message-is-friendly-english-and-does-not-display-actor-not-available-verbatim",
-      "featureTitle": "Harden error normalization so that if an actor-not-ready error still occurs (edge cases), the user-facing message is friendly English and does not display \"Actor not available\" verbatim.",
+      "featureId": "feature-add-explicit-client-side-performance-instrumentation-for-actor-creation-and-backend-readiness-isready-so-slow-connection-setup-can-be-diagnosed-from-the-browser-when-the-debug-flag-is-enabled",
+      "featureTitle": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/OnboardClientPage.tsx",
-        "frontend/src/utils/errors.ts"
+        "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+        "frontend/src/hooks/useBackendReadiness.ts",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/utils/initialLoadTimings.ts"
       ],
       "components": [
         "authorization@4.0.0",

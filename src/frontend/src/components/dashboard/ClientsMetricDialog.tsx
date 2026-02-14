@@ -138,7 +138,7 @@ export function ClientsMetricDialog({
                             <TableCell>
                               {client.subscriptionSummary?.endDate
                                 ? formatDate(client.subscriptionSummary.endDate)
-                                : 'N/A'}
+                                : '—'}
                             </TableCell>
                           )}
                           {showOnboardingState && (

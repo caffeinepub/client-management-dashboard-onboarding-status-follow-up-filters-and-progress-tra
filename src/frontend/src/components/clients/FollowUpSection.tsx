@@ -61,7 +61,7 @@ export function FollowUpSection({ client, onMarkDone, isMarkingDone = false }: F
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Mark as Done
+                  Follow Marked Done
                 </>
               )}
             </Button>

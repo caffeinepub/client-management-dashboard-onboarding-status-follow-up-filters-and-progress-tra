@@ -8,15 +8,12 @@ import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
-
-
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
 // Apply migration from old to new state on upgrade via the with clause.
 
 actor {
-  // Authorization system using prefabricated component modules
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -26,6 +23,10 @@ actor {
   };
 
   let userProfiles = Map.empty<Principal, UserProfile>();
+
+  public query func isReady() : async Bool {
+    true;
+  };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -517,6 +518,12 @@ actor {
     updateClientOnboardingState(clientCode, state);
   };
 
+  // Explicit full onboarding conversion method
+  public shared ({ caller }) func convertToFullOnboarding(clientCode : Nat) : async () {
+    requireUserRole(caller);
+    updateClientOnboardingState(clientCode, #full);
+  };
+
   public query ({ caller }) func getClientsByFollowUpDay(day : FollowUpDay) : async [ExtendedClient] {
     requireUserRole(caller);
 
@@ -665,6 +672,7 @@ actor {
 
   // New: optimized query to return initial app data
   public query ({ caller }) func getAppInitData() : async AppInitData {
+    requireUserRole(caller);
     let clientSummaries = clients.toArray().map(func((_, client)) { convertToClientSummary(client) });
     let userProfile = userProfiles.get(caller);
     { clientSummaries; userProfile };
@@ -721,7 +729,6 @@ actor {
     );
   };
 
-  // New helper function to convert to ClientSummary array
   func convertToClientSummaries(clients : [Client]) : [ClientSummary] {
     clients.map(func(client) { convertToClientSummary(client) });
   };
@@ -747,4 +754,3 @@ actor {
     };
   };
 };
-

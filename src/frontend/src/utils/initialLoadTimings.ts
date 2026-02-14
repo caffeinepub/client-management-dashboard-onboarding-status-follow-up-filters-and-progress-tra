@@ -1,6 +1,7 @@
 /**
  * Lightweight timing utility for tracking initial load performance.
  * Captures labeled start/end timestamps and emits a consolidated console report.
+ * Gated by debug URL parameter to minimize overhead in production.
  */
 
 interface TimingEvent {
@@ -12,7 +13,7 @@ interface TimingEvent {
 
 class InitialLoadTimings {
   private events: TimingEvent[] = [];
-  private reported = false;
+  private hasReported = false;
   private debugEnabled = false;
 
   constructor() {
@@ -24,7 +25,7 @@ class InitialLoadTimings {
   }
 
   start(label: string) {
-    if (this.reported) return;
+    if (!this.debugEnabled) return;
     
     const existing = this.events.find(e => e.label === label && !e.endTime);
     if (existing) return; // Already started
@@ -36,7 +37,7 @@ class InitialLoadTimings {
   }
 
   end(label: string) {
-    if (this.reported) return;
+    if (!this.debugEnabled) return;
     
     const event = this.events.find(e => e.label === label && !e.endTime);
     if (!event) return;
@@ -46,8 +47,9 @@ class InitialLoadTimings {
   }
 
   report() {
-    if (this.reported) return;
-    this.reported = true;
+    if (!this.debugEnabled) return;
+    if (this.hasReported) return;
+    this.hasReported = true;
 
     const completedEvents = this.events.filter(e => e.duration !== undefined);
     if (completedEvents.length === 0) return;

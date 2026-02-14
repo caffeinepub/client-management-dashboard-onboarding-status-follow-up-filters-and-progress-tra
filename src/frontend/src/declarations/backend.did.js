@@ -114,6 +114,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'convertToFullOnboarding' : IDL.Func([IDL.Nat], [], []),
   'createClient' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
       [IDL.Nat],
@@ -189,6 +190,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'isReady' : IDL.Func([], [IDL.Bool], ['query']),
   'pauseClient' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
   'recordFollowUp' : IDL.Func(
       [IDL.Nat, FollowUpDay, IDL.Bool, IDL.Text],
@@ -308,6 +310,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'convertToFullOnboarding' : IDL.Func([IDL.Nat], [], []),
     'createClient' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
         [IDL.Nat],
@@ -387,6 +390,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'isReady' : IDL.Func([], [IDL.Bool], ['query']),
     'pauseClient' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
     'recordFollowUp' : IDL.Func(
         [IDL.Nat, FollowUpDay, IDL.Bool, IDL.Text],

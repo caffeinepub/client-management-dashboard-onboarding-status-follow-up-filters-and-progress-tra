@@ -184,6 +184,7 @@ export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     addProgress(clientCode: bigint, weightKg: number, neckInch: number, chestInch: number, waistInch: number, hipsInch: number, thighInch: number): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    convertToFullOnboarding(clientCode: bigint): Promise<void>;
     createClient(name: string, mobileNumber: string, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
     createOrRenewSubscription(clientCode: bigint, planDurationDays: bigint, extraDays: bigint, startDate: Time): Promise<void>;
     expireMembershipImmediately(clientCode: bigint): Promise<void>;
@@ -211,6 +212,7 @@ export interface backendInterface {
     }>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    isReady(): Promise<boolean>;
     pauseClient(clientCode: bigint, durationDays: bigint, reason: string): Promise<void>;
     recordFollowUp(clientCode: bigint, followUpDay: FollowUpDay, done: boolean, notes: string): Promise<void>;
     resetOnboardingState(clientCode: bigint): Promise<void>;
@@ -261,6 +263,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async convertToFullOnboarding(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.convertToFullOnboarding(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.convertToFullOnboarding(arg0);
             return result;
         }
     }
@@ -548,6 +564,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async isReady(): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.isReady();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.isReady();
             return result;
         }
     }

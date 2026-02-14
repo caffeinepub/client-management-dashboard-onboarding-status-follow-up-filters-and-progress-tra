@@ -1,72 +1,84 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Stabilize onboarding flow during backend initialization to avoid raw actor errors",
+  "title": "Stabilize backend readiness polling, reduce React Query refetch storms, and add debug timing instrumentation",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Gate Onboard Client submission until the backend connection is ready and prevent any submission attempts (including Enter key) during initialization windows.",
+      "summary": "Stabilize backend readiness polling so retries don't reset on state changes and use bounded exponential backoff with proper timer cleanup.",
       "acceptanceCriteria": [
-        "On Onboard Client page, the \"Create Client\" action is disabled (and cannot submit via Enter) until the backend actor is ready.",
-        "While waiting for actor readiness, the page shows a clear loading/disabled state (English text) indicating the app is connecting/initializing.",
-        "Attempting to onboard during an actor-not-ready window does not show a toast or inline message containing the literal text \"Actor not available\".",
-        "Once the actor becomes ready, the form becomes usable automatically without requiring a manual refresh."
+        "When authenticated, the app should not stay stuck on the \"Connecting... / Establishing connection to backend\" screen indefinitely under normal conditions.",
+        "The readiness check must not reset its internal retry counter on every retry attempt (i.e., retry scheduling should not cause the effect to restart and reinitialize state).",
+        "After readiness becomes true once, subsequent renders/navigation must not trigger repeated readiness polling unless identity/actor truly changes.",
+        "Readiness polling must clean up timers correctly to avoid multiple concurrent polling loops."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/pages/OnboardClientPage.tsx",
+          "path": "frontend/src/hooks/useBackendReadiness.ts",
           "operation": "modify",
-          "description": "Use actor readiness to hard-disable all onboarding mutations until ready: derive a single boolean for \"canInteract\" (based on stable readiness), disable the submit button and form fields accordingly, and add a guard at the top of handleSubmit to no-op when not ready (preventing mutation calls). Add keyboard handling so pressing Enter cannot submit while disabled (e.g., preventDefault in onKeyDown when not interactable). Ensure the loading/disabled copy is English and does not include internal terms like \"actor\"."
+          "description": "Refactor readiness polling to avoid using retryCount as a useEffect dependency (prevent effect restarts). Use refs to track retry attempt count, active timer id, and an in-flight flag; implement bounded exponential backoff (cap delay and cap attempt growth) and ensure a single polling loop per actor instance with robust cleanup on actor/identity change."
         },
         {
           "path": "frontend/src/hooks/useStableActorConnection.ts",
-          "operation": "create",
-          "description": "Create a small wrapper hook around the existing useActorReady that exposes a stabilized connection state for UI gating (e.g., introduces a short minimum loading duration and/or a debounce to avoid rapid toggling when actor is created/invalidated). Use this hook from the onboarding page to decide disabled/loading state."
+          "operation": "modify",
+          "description": "Align connection gating with the updated readiness hook semantics (e.g., ensure connecting/ready transitions are driven solely by the stabilized isChecking/isReady signals and do not re-trigger readiness work)."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Make onboarding readiness UI stable and non-flickering while backend connection state changes, showing a consistent connecting experience without exposing technical terms.",
+      "summary": "Prevent global query invalidation/refetch storms on actor creation/changes by relying on enabled queries and stable cache keys instead of unconditional refetching.",
       "acceptanceCriteria": [
-        "Onboard Client page does not rapidly toggle between enabled and disabled states when the actor changes (e.g., after login, refresh, or canister upgrade).",
-        "Loading indicator and copy are in English and do not expose internal technical terms like \"actor\" to the end user (e.g., prefer \"Connecting…\" / \"Preparing the app…\")."
+        "Actor creation should not immediately trigger a refetch of all non-actor queries multiple times in quick succession.",
+        "React Query caches should remain stable across normal navigation; backend calls should be driven by enabled queries becoming active, not by unconditional global refetches.",
+        "Manual testing: after initial load, clicking around dashboard/clients/client pages should not repeatedly show the global connecting screen or cause repeated initial-data fetch patterns without an identity change."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useStableActorConnection.ts",
+          "path": "frontend/src/hooks/useActor.ts",
           "operation": "modify",
-          "description": "Implement stabilization logic for connection readiness (debounce/hysteresis) so transient actor invalidation windows don't cause rapid UI state flips. Provide a simple API (e.g., { isConnecting, isReady }) that the onboarding page can consume for consistent rendering."
+          "description": "Replace unconditional invalidateQueries+refetchQueries-on-actor-change behavior with a more targeted approach: only react when the actor instance truly changes (track previous actor in a ref), avoid global refetches, and prefer letting enabled queries fetch naturally when active. Keep the existing Internet Identity flow intact."
         },
         {
-          "path": "frontend/src/pages/OnboardClientPage.tsx",
+          "path": "frontend/src/hooks/useActorReady.ts",
           "operation": "modify",
-          "description": "Render a stable connecting/initializing state driven by the stabilized readiness hook: show a non-flickering loader + English copy (e.g., \"Connecting…\" / \"Preparing the app…\") and keep the form controls disabled until the ready signal is stable. Avoid flashing between enabled/disabled by relying only on the stabilized state for UI."
+          "description": "Review and adjust the actorReady timing signal (if needed) to ensure actor transitions don't cause query thrash (e.g., avoid repeated toggling during actor recreation) while preserving the intent of preventing queries from mounting during actor-change windows."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Normalize actor-not-ready errors into friendly English and ensure the onboarding flow never displays the literal \"Actor not available\" message.",
+      "summary": "Add debug-only client-side performance instrumentation for actor creation, backend readiness polling duration, and app init fetch timing, visible in the existing debug panel and/or console.",
       "acceptanceCriteria": [
-        "If a thrown error message includes \"Actor not available\", the displayed message is replaced with a user-friendly English message (e.g., \"The app is still starting up. Please try again in a few seconds.\").",
-        "No user-facing toast or inline error in the onboarding flow displays the literal string \"Actor not available\"."
+        "When the URL contains the existing debug flag, the app records timing events for: actor creation, readiness polling duration (time until first successful isReady), and app init data fetch.",
+        "The timing report is visible via the existing debug panel and/or console report without requiring code edits to enable it.",
+        "Instrumentation does not change user-facing behavior when debug is not enabled."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/errors.ts",
+          "path": "frontend/src/utils/initialLoadTimings.ts",
           "operation": "modify",
-          "description": "Extend normalizeError to explicitly detect actor-not-ready conditions (including message containing \"Actor not available\") and replace them with a friendly English startup message. Ensure the returned message never contains the literal substring \"Actor not available\"."
+          "description": "Adjust the timing utility so it is gated by the existing debug flag (no console output and minimal overhead when debug is disabled). Ensure reporting does not permanently freeze timing collection (allow actor creation/readiness events even if an initial report already occurred)."
         },
         {
-          "path": "frontend/src/pages/OnboardClientPage.tsx",
+          "path": "frontend/src/hooks/useActor.ts",
           "operation": "modify",
-          "description": "Ensure onboarding error surfaces only normalized messages: keep using normalizeError for toasts, and avoid emitting any toast/inline error when the form is disabled due to connecting state (so edge-case submission attempts cannot leak raw errors)."
+          "description": "Add debug-only timing marks for actor creation (e.g., start before createActorWithConfig and end after access-control initialization completes) using the existing timings utility, without altering the authentication behavior."
         },
         {
-          "path": "frontend/src/App.tsx",
+          "path": "frontend/src/hooks/useBackendReadiness.ts",
           "operation": "modify",
-          "description": "Prevent raw technical errors from being displayed in the global init error UI by replacing the direct error.message rendering with normalizeError(error) (still logging raw error to console). This reduces the chance of \"Actor not available\" being shown anywhere user-facing during initialization windows."
+          "description": "Add debug-only timing marks for backend readiness polling duration (start when polling begins for a new actor; end on the first successful readiness confirmation). Ensure retries do not create multiple overlapping timing events."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure app init fetch timing is recorded under the debug flag (keep/standardize the existing 'app-init-data-fetch' event), and ensure reporting is invoked in a way that keeps the debug panel updated while avoiding unintended console output when debug is disabled."
+        },
+        {
+          "path": "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+          "operation": "modify",
+          "description": "Update the debug panel (without editing any files under frontend/src/components/ui) to display the added timing labels clearly (actor creation and backend readiness) and ensure it remains driven by the existing debug flag."
         }
       ]
     }

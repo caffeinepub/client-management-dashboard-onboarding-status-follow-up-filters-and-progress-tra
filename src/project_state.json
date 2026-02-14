@@ -1,49 +1,42 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Project now includes stabilizing client onboarding UI loading to prevent backend actor-not-ready errors (\"Actor not available\").",
+  "summary": "New project",
   "architectural_notes": [
-    "During onboarding, frontend should gate calls on backend actor/canister readiness (e.g., retry/backoff or wait-for-ready) to prevent \"Actor not available\"."
+    "Investigate persistent slow connection establishment to backend despite good network (possible client agent config, repeated identity/auth flows, inefficient initialization, or backend call latency)."
   ],
   "known_issues": [
-    "Onboarding can show \"Actor not available\" when frontend calls backend actor before deployment/upgrade is ready."
+    "App is slow every time when establishing connection to backend; user reports network is good and requests code review for performance regression."
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-prevent-the-onboard-client-flow-from-submitting-any-backend-mutations-until-the-backend-actor-is-fully-ready-so-onboarding-never-surfaces-the-raw-error-text-actor-not-available-during-normal-loading-upgrade-windows",
-      "title": "Prevent the Onboard Client flow from submitting any backend mutations until the backend actor is fully ready, so onboarding never surfaces the raw error text \"Actor not available\" during normal loading/upgrade windows.",
+      "id": "feature-fix-the-frontend-backend-readiness-polling-so-it-does-not-continuously-reset-and-re-poll-due-to-state-changes-and-so-it-performs-bounded-exponential-backoff-until-readiness-is-confirmed",
+      "title": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-the-onboarding-page-ui-to-handle-actor-readiness-explicitly-show-a-stable-non-flickering-loading-experience-and-avoid-transient-enable-disable-states-while-the-actor-is-being-created-invalidated",
-      "title": "Update the onboarding page UI to handle actor readiness explicitly: show a stable, non-flickering loading experience and avoid transient enable/disable states while the actor is being created/invalidated.",
+      "id": "feature-reduce-unnecessary-query-invalidation-refetch-storms-when-the-actor-is-created-changes-to-avoid-repeated-backend-calls-that-can-make-the-app-feel-like-it-is-re-connecting-on-every-interaction",
+      "title": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-harden-error-normalization-so-that-if-an-actor-not-ready-error-still-occurs-edge-cases-the-user-facing-message-is-friendly-english-and-does-not-display-actor-not-available-verbatim",
-      "title": "Harden error normalization so that if an actor-not-ready error still occurs (edge cases), the user-facing message is friendly English and does not display \"Actor not available\" verbatim.",
+      "id": "feature-add-explicit-client-side-performance-instrumentation-for-actor-creation-and-backend-readiness-isready-so-slow-connection-setup-can-be-diagnosed-from-the-browser-when-the-debug-flag-is-enabled",
+      "title": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [
-    {
-      "id": "AR-1",
-      "summary": "Stabilize onboarding loading state so UI waits for backend actor/canister readiness and avoids \"Actor not available\" errors",
-      "reqIds": [],
-      "status": "pending"
-    }
-  ],
-  "projectName": "Stabilize onboarding flow to prevent “Actor not available” errors",
+  "new_feature_requests": [],
+  "projectName": "Investigate and fix persistent slow backend connection by stabilizing readiness polling and query refetch behavior",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

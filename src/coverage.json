@@ -1,7 +1,7 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T22:16:03.572Z",
+  "generatedAt": "2026-02-14T23:12:05.797Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
@@ -12,43 +12,44 @@
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Prevent the Onboard Client flow from submitting any backend mutations until the backend actor is fully ready, so onboarding never surfaces the raw error text \"Actor not available\" during normal loading/upgrade windows.",
+        "summary": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/OnboardClientPage.tsx",
+          "frontend/src/hooks/useBackendReadiness.ts",
           "frontend/src/hooks/useStableActorConnection.ts"
         ],
         "matchedFiles": [
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/hooks/useStableActorConnection.ts"
+          "frontend/src/hooks/useBackendReadiness.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Update the onboarding page UI to handle actor readiness explicitly: show a stable, non-flickering loading experience and avoid transient enable/disable states while the actor is being created/invalidated.",
+        "summary": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/hooks/useStableActorConnection.ts",
-          "frontend/src/pages/OnboardClientPage.tsx"
+          "frontend/src/hooks/useActor.ts",
+          "frontend/src/hooks/useActorReady.ts"
         ],
         "matchedFiles": [
-          "frontend/src/hooks/useStableActorConnection.ts",
-          "frontend/src/pages/OnboardClientPage.tsx"
+          "frontend/src/hooks/useActorReady.ts"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Harden error normalization so that if an actor-not-ready error still occurs (edge cases), the user-facing message is friendly English and does not display \"Actor not available\" verbatim.",
+        "summary": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/utils/errors.ts",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/utils/initialLoadTimings.ts",
+          "frontend/src/hooks/useActor.ts",
+          "frontend/src/hooks/useBackendReadiness.ts",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/debug/InitialLoadDebugPanel.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/utils/errors.ts",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/utils/initialLoadTimings.ts",
+          "frontend/src/hooks/useBackendReadiness.ts",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/debug/InitialLoadDebugPanel.tsx"
         ]
       }
     ]
@@ -58,10 +59,11 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
-    "frontend/src/hooks/useStableActorConnection.ts",
-    "frontend/src/pages/OnboardClientPage.tsx",
-    "frontend/src/utils/errors.ts",
+    "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+    "frontend/src/hooks/useActorReady.ts",
+    "frontend/src/hooks/useBackendReadiness.ts",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/utils/initialLoadTimings.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useActorReady } from './useActorReady';
+import { useBackendReadiness } from './useBackendReadiness';
 import { useInternetIdentity } from './useInternetIdentity';
 import type { FollowUpDay, OnboardingState, Time, UserProfile, ExtendedClient, ClientSummary, AppInitData } from '../backend';
 import { isClientActivated, getClientStatus, EXPIRING_WINDOW_DAYS } from '../utils/status';
@@ -15,9 +15,10 @@ function useIdentityKey() {
 /**
  * Combined initial app data fetch - uses backend's getAppInitData for optimal startup.
  * Seeds both profile and client summaries caches from a single call.
+ * Now gated on confirmed backend readiness.
  */
 export function useGetAppInitData() {
-  const { actor, isFetching: actorFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -26,9 +27,16 @@ export function useGetAppInitData() {
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       
-      timings.start('app-init-data-fetch');
+      if (timings.isDebugEnabled()) {
+        timings.start('app-init-data-fetch');
+      }
+      
       const data = await actor.getAppInitData();
-      timings.end('app-init-data-fetch');
+      
+      if (timings.isDebugEnabled()) {
+        timings.end('app-init-data-fetch');
+        timings.report();
+      }
 
       // Seed individual caches from combined response
       queryClient.setQueryData(['currentUserProfile', identityKey], data.userProfile);
@@ -43,12 +51,10 @@ export function useGetAppInitData() {
         half,
         full,
       });
-
-      timings.report();
       
       return data;
     },
-    enabled: !!actor && !actorFetching && actorReady,
+    enabled: !!actor && isReady,
     staleTime: 60_000, // 1 minute - prevent refetch during initial navigation
     gcTime: 5 * 60_000, // 5 minutes
     retry: 1,
@@ -56,19 +62,16 @@ export function useGetAppInitData() {
 }
 
 export function useGetCallerUserProfile() {
-  const { actor, isFetching: actorFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
   const query = useQuery<UserProfile | null>({
     queryKey: ['currentUserProfile', identityKey],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      timings.start('profile-fetch');
-      const profile = await actor.getCallerUserProfile();
-      timings.end('profile-fetch');
-      return profile;
+      return await actor.getCallerUserProfile();
     },
-    enabled: !!actor && !actorFetching && actorReady,
+    enabled: !!actor && isReady,
     retry: 1,
     staleTime: 60_000, // 1 minute
     gcTime: 5 * 60_000, // 5 minutes
@@ -76,13 +79,13 @@ export function useGetCallerUserProfile() {
 
   return {
     ...query,
-    isLoading: actorFetching || query.isLoading,
-    isFetched: !!actor && query.isFetched,
+    isLoading: !isReady || query.isLoading,
+    isFetched: isReady && query.isFetched,
   };
 }
 
 export function useSaveCallerUserProfile() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -103,7 +106,7 @@ export function useSaveCallerUserProfile() {
  * This is the primary query for initial page loads.
  */
 export function useGetClientSummaries() {
-  const { actor, isFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
   return useQuery({
@@ -111,13 +114,11 @@ export function useGetClientSummaries() {
     queryFn: async () => {
       if (!actor) return { activated: [], half: [], full: [] };
       
-      timings.start('client-summaries-fetch');
       // Fetch both activated and non-activated summaries in parallel
       const [activated, nonActivated] = await Promise.all([
         actor.getActivatedClientSummaries(),
         actor.getNonActivatedClientSummaries(),
       ]);
-      timings.end('client-summaries-fetch');
       
       return {
         activated,
@@ -125,7 +126,7 @@ export function useGetClientSummaries() {
         full: nonActivated.fullOnboardedClients,
       };
     },
-    enabled: !!actor && !isFetching && actorReady,
+    enabled: !!actor && isReady,
     staleTime: 60_000, // 1 minute
     gcTime: 5 * 60_000, // 5 minutes
   });
@@ -153,7 +154,7 @@ export function useGetAllClientSummaries() {
  * Prefer useGetClientSummaries for list views.
  */
 export function useGetAllClients() {
-  const { actor, isFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
   return useQuery({
@@ -171,7 +172,7 @@ export function useGetAllClients() {
         ...result.fullOnboardedClients,
       ];
     },
-    enabled: !!actor && !isFetching && actorReady,
+    enabled: !!actor && isReady,
     staleTime: 60_000, // 1 minute
     gcTime: 5 * 60_000, // 5 minutes
   });
@@ -181,7 +182,7 @@ export function useGetAllClients() {
  * Fetch full client details for a specific client by code.
  */
 export function useGetClient(clientCode: bigint | null) {
-  const { actor, isFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -200,7 +201,7 @@ export function useGetClient(clientCode: bigint | null) {
       // If not in cache, fetch single client by code
       return actor.getClientByCode(clientCode);
     },
-    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
+    enabled: !!actor && isReady && clientCode !== null,
     staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60_000, // 5 minutes
   });
@@ -211,7 +212,7 @@ export function useGetClient(clientCode: bigint | null) {
  * Fetches full ExtendedClient records for a given set of client codes.
  */
 export function usePrepareClientsForExport() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -309,7 +310,7 @@ export function useGetExpiringClients() {
 }
 
 export function useGetClientProgress(clientCode: bigint | null) {
-  const { actor, isFetching, actorReady } = useActorReady();
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
   return useQuery({
@@ -318,14 +319,14 @@ export function useGetClientProgress(clientCode: bigint | null) {
       if (!actor || !clientCode) return [];
       return actor.getClientProgress(clientCode);
     },
-    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
+    enabled: !!actor && isReady && clientCode !== null,
     staleTime: 30_000, // 30 seconds
     gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
 export function useCreateClient() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -353,7 +354,7 @@ export function useCreateClient() {
 }
 
 export function useActivateClient() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -395,7 +396,7 @@ export function useActivateClient() {
 }
 
 export function useRenewSubscription() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -423,8 +424,8 @@ export function useRenewSubscription() {
   });
 }
 
-export function useExpireMembershipImmediately() {
-  const { actor } = useActorReady();
+export function useExpireMembership() {
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -443,7 +444,7 @@ export function useExpireMembershipImmediately() {
 }
 
 export function useAddProgress() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -476,22 +477,18 @@ export function useAddProgress() {
 }
 
 export function usePauseClient() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (params: {
       clientCode: bigint;
-      pauseDurationDays: number;
-      pauseReason: string;
+      durationDays: bigint;
+      reason: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.pauseClient(
-        params.clientCode,
-        BigInt(params.pauseDurationDays),
-        params.pauseReason
-      );
+      return actor.pauseClient(params.clientCode, params.durationDays, params.reason);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
@@ -503,7 +500,7 @@ export function usePauseClient() {
 }
 
 export function useResumeClient() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -522,12 +519,15 @@ export function useResumeClient() {
 }
 
 export function useUpdateOnboardingState() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { clientCode: bigint; state: OnboardingState }) => {
+    mutationFn: async (params: {
+      clientCode: bigint;
+      state: OnboardingState;
+    }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.updateOnboardingState(params.clientCode, params.state);
     },
@@ -540,8 +540,27 @@ export function useUpdateOnboardingState() {
   });
 }
 
+export function useConvertToFullOnboarding() {
+  const { actor } = useBackendReadiness();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientCode: bigint) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.convertToFullOnboarding(clientCode);
+    },
+    onSuccess: (_data, clientCode) => {
+      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
+    },
+  });
+}
+
 export function useRecordFollowUp() {
-  const { actor } = useActorReady();
+  const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
@@ -562,22 +581,7 @@ export function useRecordFollowUp() {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
     },
-  });
-}
-
-export function useGetFollowUpHistory(clientCode: bigint | null) {
-  const { actor, isFetching, actorReady } = useActorReady();
-  const identityKey = useIdentityKey();
-
-  return useQuery({
-    queryKey: ['followUpHistory', clientCode?.toString(), identityKey],
-    queryFn: async () => {
-      if (!actor || !clientCode) return [];
-      return actor.getFollowUpHistory(clientCode);
-    },
-    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
-    staleTime: 30_000, // 30 seconds
-    gcTime: 5 * 60_000, // 5 minutes
   });
 }

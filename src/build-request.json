@@ -1,70 +1,77 @@
 {
   "kind": "build_request",
-  "title": "Stabilize onboarding flow to prevent “Actor not available” errors",
+  "title": "Investigate and fix persistent slow backend connection by stabilizing readiness polling and query refetch behavior",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Prevent the Onboard Client flow from submitting any backend mutations until the backend actor is fully ready, so onboarding never surfaces the raw error text \"Actor not available\" during normal loading/upgrade windows.",
+      "text": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "recent-messages-user-4"
         ],
         "quotes": [
-          "\" Actor not available \" Showing this error  while onboarding the client stabilize the loading so this error doesn’t appear again"
+          "network is good cross check the codes"
         ]
       },
       "acceptanceCriteria": [
-        "On Onboard Client page, the \"Create Client\" action is disabled (and cannot submit via Enter) until the backend actor is ready.",
-        "While waiting for actor readiness, the page shows a clear loading/disabled state (English text) indicating the app is connecting/initializing.",
-        "Attempting to onboard during an actor-not-ready window does not show a toast or inline message containing the literal text \"Actor not available\".",
-        "Once the actor becomes ready, the form becomes usable automatically without requiring a manual refresh."
+        "When authenticated, the app should not stay stuck on the \"Connecting... / Establishing connection to backend\" screen indefinitely under normal conditions.",
+        "The readiness check must not reset its internal retry counter on every retry attempt (i.e., retry scheduling should not cause the effect to restart and reinitialize state).",
+        "After readiness becomes true once, subsequent renders/navigation must not trigger repeated readiness polling unless identity/actor truly changes.",
+        "Readiness polling must clean up timers correctly to avoid multiple concurrent polling loops."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Update the onboarding page UI to handle actor readiness explicitly: show a stable, non-flickering loading experience and avoid transient enable/disable states while the actor is being created/invalidated.",
+      "text": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "recent-messages-user-2",
+          "recent-messages-user-4"
         ],
         "quotes": [
-          "stabilize the loading so this error doesn’t appear again"
+          "got slow again taking much time to establish connection to backend",
+          "network is good cross check the codes"
         ]
       },
       "acceptanceCriteria": [
-        "Onboard Client page does not rapidly toggle between enabled and disabled states when the actor changes (e.g., after login, refresh, or canister upgrade).",
-        "Loading indicator and copy are in English and do not expose internal technical terms like \"actor\" to the end user (e.g., prefer \"Connecting…\" / \"Preparing the app…\")."
+        "Actor creation should not immediately trigger a refetch of all non-actor queries multiple times in quick succession.",
+        "React Query caches should remain stable across normal navigation; backend calls should be driven by enabled queries becoming active, not by unconditional global refetches.",
+        "Manual testing: after initial load, clicking around dashboard/clients/client pages should not repeatedly show the global connecting screen or cause repeated initial-data fetch patterns without an identity change."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Harden error normalization so that if an actor-not-ready error still occurs (edge cases), the user-facing message is friendly English and does not display \"Actor not available\" verbatim.",
+      "text": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-4"
+          "recent-messages-user-2",
+          "recent-messages-user-4"
         ],
         "quotes": [
-          "\" Actor not available \" Showing this error"
+          "got slow again taking much time to establish connection to backend",
+          "network is good cross check the codes"
         ]
       },
       "acceptanceCriteria": [
-        "If a thrown error message includes \"Actor not available\", the displayed message is replaced with a user-friendly English message (e.g., \"The app is still starting up. Please try again in a few seconds.\").",
-        "No user-facing toast or inline error in the onboarding flow displays the literal string \"Actor not available\"."
+        "When the URL contains the existing debug flag, the app records timing events for: actor creation, readiness polling duration (time until first successful isReady), and app init data fetch.",
+        "The timing report is visible via the existing debug panel and/or console report without requiring code edits to enable it.",
+        "Instrumentation does not change user-facing behavior when debug is not enabled."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend immutablePaths (including frontend/src/hooks/useActor.ts and Internet Identity hooks).",
-    "Use English for any user-facing text."
+    "Do not edit files under frontend/src/components/ui (read-only).",
+    "Do not edit frontend/src/hooks/useInternetIdentity.ts or frontend/src/hooks/useActor.ts in ways that break Internet Identity authentication; keep the existing auth flow intact.",
+    "Backend must remain single-actor in backend/main.mo; only add backend changes if strictly required for readiness/performance diagnostics."
   ],
   "nonGoals": [
-    "Do not add new authentication providers (Internet Identity remains the only auth).",
-    "Do not introduce new backend services or databases.",
-    "Do not change backend canister interfaces unless strictly required to achieve the loading stabilization."
+    "Do not add new third-party monitoring/analytics services.",
+    "Do not implement real-time features (WebSockets) or external databases.",
+    "Do not change product features unrelated to connection/performance (e.g., client management, follow-ups) beyond what is needed to diagnose/fix the slowness."
   ],
   "imageRequirements": {
     "required": [],

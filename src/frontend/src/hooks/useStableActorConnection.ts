@@ -1,37 +1,37 @@
 import { useEffect, useState } from 'react';
-import { useActorReady } from './useActorReady';
+import { useBackendReadiness } from './useBackendReadiness';
 
 /**
  * Provides a stabilized connection state for UI gating.
- * Introduces a minimum loading duration and debounce to avoid rapid toggling
- * when actor is created/invalidated (e.g., after login, refresh, or canister upgrade).
+ * Now relies on confirmed backend readiness (successful isReady() call)
+ * rather than just actor availability timing.
+ * Resets to connecting immediately when actor/identity changes.
  */
 export function useStableActorConnection() {
-  const { actor, isFetching, actorReady } = useActorReady();
+  const { actor, isChecking, isReady } = useBackendReadiness();
   const [isConnecting, setIsConnecting] = useState(true);
-  const [isReady, setIsReady] = useState(false);
+  const [connectionReady, setConnectionReady] = useState(false);
 
   useEffect(() => {
-    // If actor is not ready, immediately show connecting state
-    if (!actor || isFetching || !actorReady) {
+    // If backend is not ready yet, immediately show connecting state
+    if (isChecking || !isReady) {
       setIsConnecting(true);
-      setIsReady(false);
+      setConnectionReady(false);
       return;
     }
 
-    // Actor is ready - add a small stabilization delay to prevent flicker
-    // This ensures transient actor invalidation windows don't cause rapid UI state flips
+    // Backend readiness confirmed - add small stabilization delay to prevent flicker
     const stabilizationTimer = setTimeout(() => {
       setIsConnecting(false);
-      setIsReady(true);
+      setConnectionReady(true);
     }, 100);
 
     return () => clearTimeout(stabilizationTimer);
-  }, [actor, isFetching, actorReady]);
+  }, [isChecking, isReady]);
 
   return {
     isConnecting,
-    isReady,
+    isReady: connectionReady,
     actor,
   };
 }

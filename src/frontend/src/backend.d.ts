@@ -101,6 +101,7 @@ export enum UserRole {
 export interface backendInterface {
     addProgress(clientCode: bigint, weightKg: number, neckInch: number, chestInch: number, waistInch: number, hipsInch: number, thighInch: number): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    convertToFullOnboarding(clientCode: bigint): Promise<void>;
     createClient(name: string, mobileNumber: string, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
     createOrRenewSubscription(clientCode: bigint, planDurationDays: bigint, extraDays: bigint, startDate: Time): Promise<void>;
     expireMembershipImmediately(clientCode: bigint): Promise<void>;
@@ -128,6 +129,7 @@ export interface backendInterface {
     }>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    isReady(): Promise<boolean>;
     pauseClient(clientCode: bigint, durationDays: bigint, reason: string): Promise<void>;
     recordFollowUp(clientCode: bigint, followUpDay: FollowUpDay, done: boolean, notes: string): Promise<void>;
     resetOnboardingState(clientCode: bigint): Promise<void>;

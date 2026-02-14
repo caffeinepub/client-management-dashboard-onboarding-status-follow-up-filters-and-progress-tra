@@ -98,6 +98,7 @@ export interface _SERVICE {
     undefined
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'convertToFullOnboarding' : ActorMethod<[bigint], undefined>,
   'createClient' : ActorMethod<
     [string, string, string, OnboardingState],
     bigint
@@ -140,6 +141,7 @@ export interface _SERVICE {
   >,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'isReady' : ActorMethod<[], boolean>,
   'pauseClient' : ActorMethod<[bigint, bigint, string], undefined>,
   'recordFollowUp' : ActorMethod<
     [bigint, FollowUpDay, boolean, string],
