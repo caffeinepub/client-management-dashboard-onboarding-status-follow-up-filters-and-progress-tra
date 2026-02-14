@@ -196,6 +196,7 @@ export function ClientsListPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredSummaries.map((client) => {
             const displayStatus = getDisplayStatus(client);
+            const endDate = client.subscriptionSummary?.endDate;
             return (
               <Card
                 key={client.code.toString()}
@@ -219,10 +220,10 @@ export function ClientsListPage() {
                         <Phone className="h-4 w-4" />
                         <span>{client.mobileNumber}</span>
                       </div>
-                      {client.endDate && (
+                      {endDate && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span>Ends: {formatDate(client.endDate)}</span>
+                          <span>Ends: {formatDate(endDate)}</span>
                         </div>
                       )}
                     </div>

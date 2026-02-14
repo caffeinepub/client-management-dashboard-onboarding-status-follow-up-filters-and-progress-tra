@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { useInternetIdentity } from './hooks/useInternetIdentity';
-import { useGetCallerUserProfile } from './hooks/useQueries';
+import { useGetAppInitData } from './hooks/useQueries';
 import { LoginGate } from './components/auth/LoginGate';
 import { ProfileSetupDialog } from './components/auth/ProfileSetupDialog';
 import { AppLayout } from './components/layout/AppLayout';
@@ -8,6 +8,9 @@ import { RouteLoadingFallback } from './components/layout/RouteLoadingFallback';
 import { useRouter } from './hooks/useRouter';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
+import { InitialLoadDebugPanel } from './components/debug/InitialLoadDebugPanel';
+import { Button } from '@/components/ui/button';
+import { AlertCircle } from 'lucide-react';
 
 // Lazy load page components for code splitting
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -17,7 +20,7 @@ const ClientProfilePage = lazy(() => import('./pages/ClientProfilePage').then(m 
 
 function App() {
   const { identity } = useInternetIdentity();
-  const { data: userProfile, isLoading: profileLoading, isFetched } = useGetCallerUserProfile();
+  const { data: initData, isLoading: initLoading, isError, error, refetch } = useGetAppInitData();
   const { currentRoute } = useRouter();
 
   const isAuthenticated = !!identity;
@@ -26,34 +29,52 @@ function App() {
     return <LoginGate />;
   }
 
-  const showProfileSetup = isAuthenticated && !profileLoading && isFetched && userProfile === null;
+  // Show profile setup if user has no profile
+  const showProfileSetup = !initLoading && initData && initData.userProfile === null;
 
   if (showProfileSetup) {
     return <ProfileSetupDialog />;
   }
 
-  if (profileLoading || !isFetched) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-muted-foreground">Loading your profile...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <AppLayout>
-        <Suspense fallback={<RouteLoadingFallback />}>
-          {currentRoute === 'dashboard' && <DashboardPage />}
-          {currentRoute === 'clients' && <ClientsListPage />}
-          {currentRoute === 'onboard' && <OnboardClientPage />}
-          {currentRoute.startsWith('client/') && <ClientProfilePage />}
-        </Suspense>
+        {initLoading ? (
+          <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+            <div className="text-center">
+              <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+              <p className="text-muted-foreground">Loading your data...</p>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+            <div className="text-center max-w-md space-y-4">
+              <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+              <h2 className="text-xl font-semibold">Unable to Load Data</h2>
+              <p className="text-muted-foreground">
+                We encountered an issue loading your data. Please try again.
+              </p>
+              {error && (
+                <p className="text-sm text-muted-foreground">
+                  {error instanceof Error ? error.message : 'Unknown error'}
+                </p>
+              )}
+              <Button onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Suspense fallback={<RouteLoadingFallback />}>
+            {currentRoute === 'dashboard' && <DashboardPage />}
+            {currentRoute === 'clients' && <ClientsListPage />}
+            {currentRoute === 'onboard' && <OnboardClientPage />}
+            {currentRoute.startsWith('client/') && <ClientProfilePage />}
+          </Suspense>
+        )}
       </AppLayout>
       <Toaster />
+      <InitialLoadDebugPanel />
     </ThemeProvider>
   );
 }

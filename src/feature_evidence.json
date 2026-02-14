@@ -2,13 +2,33 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-react-query-data-layer-to-use-the-new-client-summary-api-as-the-default-dataset-for-initial-rendering-and-only-fetch-full-client-details-on-demand-when-a-user-navigates-to-an-individual-client-profile",
-      "featureTitle": "Update the React Query data layer to use the new client-summary API as the default dataset for initial rendering, and only fetch full client details on-demand when a user navigates to an individual client profile.",
+      "featureId": "feature-instrument-and-surface-initial-load-timings-so-we-can-identify-where-the-2-3-minute-delay-occurs-actor-creation-access-control-initialization-profile-fetch-summaries-fetch-add-a-lightweight-in-app-debug-log-console-optional-hidden-ui-panel-that-records-timestamps-and-durations-for-actor-creation-start-end-initializeaccesscontrolwithsecret-start-end-getcalleruserprofile-start-end-and-the-first-clientsummaries-fetch-start-end",
+      "featureTitle": "Instrument and surface initial-load timings so we can identify where the 2–3 minute delay occurs (actor creation, access-control initialization, profile fetch, summaries fetch). Add a lightweight in-app debug log (console + optional hidden UI panel) that records timestamps and durations for: actor creation start/end, `_initializeAccessControlWithSecret` start/end, `getCallerUserProfile` start/end, and the first `clientSummaries` fetch start/end.",
       "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
         "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/ClientsListPage.tsx",
-        "frontend/src/pages/DashboardPage.tsx",
-        "frontend/src/utils/status.ts"
+        "frontend/src/utils/initialLoadTimings.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-prevent-redundant-query-refetch-storms-during-startup-by-adjusting-the-actor-change-invalidation-behavior-in-frontend-src-hooks-useactor-ts-ensure-that-when-the-actor-becomes-available-dependent-queries-are-not-immediately-force-refetched-multiple-times-instead-invalidate-once-and-let-mounted-queries-refetch-normally-or-refetch-only-the-minimal-set-required-for-the-current-route",
+      "featureTitle": "Prevent redundant query refetch storms during startup by adjusting the actor-change invalidation behavior in `frontend/src/hooks/useActor.ts`. Ensure that when the actor becomes available, dependent queries are not immediately force-refetched multiple times; instead, invalidate once and let mounted queries refetch normally (or refetch only the minimal set required for the current route).",
+      "files": [
+        "frontend/src/hooks/useActorReady.ts",
+        "frontend/src/hooks/useQueries.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -24,11 +44,32 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-ensure-the-client-export-flow-remains-functional-with-the-streamlined-fetching-approach-including-exporting-based-on-the-currently-filtered-client-list",
-      "featureTitle": "Ensure the client export flow remains functional with the streamlined fetching approach, including exporting based on the currently filtered client list.",
+      "featureId": "feature-reduce-time-to-first-render-for-the-authenticated-app-by-updating-the-profile-gating-in-frontend-src-app-tsx-to-avoid-blocking-the-entire-app-ui-on-slow-profile-fetches-keep-the-app-responsive-by-rendering-the-shell-theme-layout-quickly-and-showing-a-clear-english-loading-state-in-the-main-content-area-while-profile-data-loads-with-a-retry-action-if-the-profile-request-fails",
+      "featureTitle": "Reduce time-to-first-render for the authenticated app by updating the profile gating in `frontend/src/App.tsx` to avoid blocking the entire app UI on slow profile fetches. Keep the app responsive by rendering the shell (theme + layout) quickly and showing a clear, English loading state in the main content area while profile data loads, with a retry action if the profile request fails.",
       "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-add-a-backend-method-that-returns-the-minimal-data-needed-for-the-first-screen-in-a-single-canister-call-e-g-current-user-profile-client-summaries-for-the-dashboard-and-update-frontend-queries-to-use-this-single-call-on-initial-load-instead-of-multiple-round-trips",
+      "featureTitle": "Add a backend method that returns the minimal data needed for the first screen in a single canister call (e.g., current user profile + client summaries for the dashboard) and update frontend queries to use this single call on initial load instead of multiple round trips.",
+      "files": [
+        "frontend/src/App.tsx",
         "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/ClientsListPage.tsx"
+        "frontend/src/pages/DashboardPage.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -40,6 +81,25 @@
       ],
       "testIds": [
         "REQ-4"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-tune-react-query-caching-for-initial-load-queries-to-avoid-unnecessary-refetching-during-startup-specifically-set-appropriate-staletime-gctime-cache-time-for-the-current-user-profile-and-client-summaries-queries-so-they-do-not-refetch-repeatedly-during-the-first-minute-unless-identity-changes-or-an-explicit-mutation-invalidation-occurs",
+      "featureTitle": "Tune React Query caching for initial-load queries to avoid unnecessary refetching during startup. Specifically, set appropriate `staleTime`/`gcTime` (cache time) for the current-user profile and client summaries queries so they do not refetch repeatedly during the first minute unless identity changes or an explicit mutation invalidation occurs.",
+      "files": [
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-5"
       ],
       "confidence": "high"
     }

@@ -2,15 +2,18 @@ import Map "mo:core/Map";
 import Time "mo:core/Time";
 import Array "mo:core/Array";
 import Nat "mo:core/Nat";
+import Int "mo:core/Int";
+import Iter "mo:core/Iter";
 import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
-import Int "mo:core/Int";
 import Text "mo:core/Text";
-import Iter "mo:core/Iter";
+
 
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
+
+// Apply migration from old to new state on upgrade via the with clause.
 
 actor {
   // Authorization system using prefabricated component modules
@@ -112,28 +115,34 @@ actor {
     followUpDay : FollowUpDay;
   };
 
+  type Subscription = {
+    planDurationDays : Nat;
+    extraDays : Nat;
+    startDate : Time.Time;
+    endDate : Time.Time;
+    createdAt : Time.Time;
+  };
+
   type Client = {
     code : Nat;
     name : Text;
     mobileNumber : Text;
-    planDurationDays : Nat;
     notes : Text;
     status : ClientStatus;
     onboardingState : OnboardingState;
     progress : [ClientProgress];
     pauseTime : ?Time.Time;
     totalPausedDuration : Int;
-    startDate : ?Time.Time;
-    endDate : ?Time.Time;
-    activatedAt : ?Time.Time;
     pauseEntries : [PauseEntry];
     followUpDay : ?FollowUpDay;
     followUpHistory : [FollowUpEntry];
+    subscriptions : [Subscription];
+    activatedAt : ?Time.Time;
   };
 
   module Client {
     public func compareByPlanEndDate(x : Client, y : Client) : Order.Order {
-      switch (x.endDate, y.endDate) {
+      switch (getCurrentEndDate(x), getCurrentEndDate(y)) {
         case (null, null) { #equal };
         case (null, ?_) { #greater };
         case (?_, null) { #less };
@@ -157,25 +166,45 @@ actor {
     public func getDueFollowUpDay(client : Client) : ?FollowUpDay {
       client.followUpDay;
     };
+
+    public func getCurrentSubscription(client : Client) : ?Subscription {
+      if (client.subscriptions.size() == 0) { return null };
+      let now = Time.now();
+      let activeSubscriptions = client.subscriptions.filter(
+        func(sub) {
+          now >= sub.startDate and now <= sub.endDate
+        }
+      );
+      if (activeSubscriptions.size() > 0) {
+        ?activeSubscriptions[activeSubscriptions.size() - 1];
+      } else {
+        ?client.subscriptions[client.subscriptions.size() - 1];
+      };
+    };
+
+    public func getCurrentEndDate(client : Client) : ?Time.Time {
+      switch (getCurrentSubscription(client)) {
+        case (?sub) { ?sub.endDate };
+        case (null) { null };
+      };
+    };
   };
 
   type ExtendedClient = {
     code : Nat;
     name : Text;
     mobileNumber : Text;
-    planDurationDays : Nat;
     notes : Text;
     status : ClientStatus;
     onboardingState : OnboardingState;
     progress : [ClientProgress];
     pauseTime : ?Time.Time;
     totalPausedDuration : Int;
-    startDate : ?Time.Time;
-    endDate : ?Time.Time;
-    activatedAt : ?Time.Time;
     pauseEntries : [PauseEntry];
     followUpDay : ?FollowUpDay;
     followUpHistory : [FollowUpEntry];
+    subscriptions : [Subscription];
+    activatedAt : ?Time.Time;
   };
 
   // Client Summary Type for Light API
@@ -183,14 +212,24 @@ actor {
     code : Nat;
     name : Text;
     mobileNumber : Text;
-    planDurationDays : Nat;
     status : ClientStatus;
     onboardingState : OnboardingState;
     pauseTime : ?Time.Time;
-    startDate : ?Time.Time;
-    endDate : ?Time.Time;
-    activatedAt : ?Time.Time;
     followUpDay : ?FollowUpDay;
+    subscriptionSummary : ?SubscriptionSummary;
+    activatedAt : ?Time.Time;
+  };
+
+  public type SubscriptionSummary = {
+    planDurationDays : Nat;
+    extraDays : Nat;
+    startDate : Time.Time;
+    endDate : Time.Time;
+  };
+
+  public type AppInitData = {
+    clientSummaries : [ClientSummary];
+    userProfile : ?UserProfile;
   };
 
   let clients = Map.empty<Nat, Client>();
@@ -199,7 +238,6 @@ actor {
   public shared ({ caller }) func createClient(
     name : Text,
     mobileNumber : Text,
-    planDurationDays : Nat,
     notes : Text,
     initialOnboardingState : OnboardingState,
   ) : async Nat {
@@ -212,23 +250,107 @@ actor {
       code = clientCode;
       name;
       mobileNumber;
-      planDurationDays;
       notes;
       status = #active;
       onboardingState = initialOnboardingState;
       progress = [];
       pauseTime = null;
       totalPausedDuration = 0;
-      startDate = null;
-      endDate = null;
-      activatedAt = null;
       pauseEntries = [];
       followUpDay = null;
       followUpHistory = [];
+      subscriptions = [];
+      activatedAt = null;
     };
 
     clients.add(clientCode, newClient);
     clientCode;
+  };
+
+  public shared ({ caller }) func createOrRenewSubscription(
+    clientCode : Nat,
+    planDurationDays : Nat,
+    extraDays : Nat,
+    startDate : Time.Time,
+  ) : async () {
+    requireUserRole(caller);
+
+    switch (clients.get(clientCode)) {
+      case (null) { Runtime.trap("Client not found") };
+      case (?client) {
+        if (client.onboardingState != #full) {
+          Runtime.trap("Cannot activate client: must complete all onboarding steps first.");
+        };
+        let endDate = startDate + ((planDurationDays + extraDays) * 86_400_000_000_000 : Int);
+        let newSubscription : Subscription = {
+          planDurationDays;
+          extraDays;
+          startDate;
+          endDate;
+          createdAt = Time.now();
+        };
+
+        let updatedClient = {
+          client with
+          status = #active;
+          subscriptions = client.subscriptions.concat([newSubscription]);
+          activatedAt = ?Time.now();
+        };
+        clients.add(clientCode, updatedClient);
+      };
+    };
+  };
+
+  public shared ({ caller }) func expireMembershipImmediately(clientCode : Nat) : async () {
+    requireUserRole(caller);
+
+    switch (clients.get(clientCode)) {
+      case (null) { Runtime.trap("Client not found") };
+      case (?client) {
+        let updatedSubscriptions = client.subscriptions.map(
+          func(subscription) {
+            if (
+              switch (client.activatedAt) {
+                case (?timestamp) {
+                  subscription.endDate > timestamp
+                };
+                case (null) { false };
+              }
+            ) {
+              { subscription with endDate = Time.now() };
+            } else {
+              subscription;
+            };
+          }
+        );
+
+        let updatedClient = {
+          client with
+          subscriptions = updatedSubscriptions;
+          status = #active;
+        };
+        clients.add(clientCode, updatedClient);
+      };
+    };
+  };
+
+  public query ({ caller }) func getCurrentSubscription(clientCode : Nat) : async ?SubscriptionSummary {
+    requireUserRole(caller);
+
+    switch (clients.get(clientCode)) {
+      case (null) { null };
+      case (?client) {
+        let currentSubscription = Client.getCurrentSubscription(client);
+        currentSubscription.map(func(subscription) {
+          {
+            planDurationDays = subscription.planDurationDays;
+            extraDays = subscription.extraDays;
+            startDate = subscription.startDate;
+            endDate = subscription.endDate;
+          };
+        });
+      };
+    };
   };
 
   public shared ({ caller }) func setFollowUpDay(clientCode : Nat, followUpDay : FollowUpDay) : async () {
@@ -372,41 +494,20 @@ actor {
               status = #active;
               pauseTime = null;
               totalPausedDuration = client.totalPausedDuration + pausedDuration;
-              endDate = client.endDate.map(func(endDate) { endDate + pausedDuration });
               pauseEntries = updatedPauseEntries;
+              subscriptions = client.subscriptions.map(
+                func(sub) {
+                  {
+                    sub with
+                    endDate = sub.endDate + pausedDuration
+                  };
+                }
+              );
             };
             clients.add(clientCode, updatedClient);
           };
           case (_) { Runtime.trap("Client is not currently paused ") };
         };
-      };
-    };
-  };
-
-  public shared ({ caller }) func activateClient(
-    clientCode : Nat,
-    startDate : Time.Time,
-    followUpDay : FollowUpDay,
-  ) : async () {
-    requireUserRole(caller);
-
-    switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
-      case (?client) {
-        if (client.onboardingState != #full) {
-          Runtime.trap("Cannot activate client: must complete all onboarding steps first.");
-        };
-        let endDate = startDate + (client.planDurationDays * 86_400_000_000_000);
-
-        let updatedClient = {
-          client with
-          status = #active;
-          startDate = ?startDate;
-          endDate = ?endDate;
-          activatedAt = ?Time.now();
-          followUpDay = ?followUpDay;
-        };
-        clients.add(clientCode, updatedClient);
       };
     };
   };
@@ -441,14 +542,14 @@ actor {
   public query ({ caller }) func getExpiringClients() : async [ExtendedClient] {
     requireUserRole(caller);
 
-    let threeDaysFromNow = Time.now() + (3 * 86_400_000_000_000);
+    let tenDaysFromNow = Time.now() + (10 * 86_400_000_000_000 : Int);
     let filteredClients = clients.values().toArray().filter(
       func(client) {
-        switch (client.endDate) {
-          case (?endDate) {
-            endDate > Time.now() and endDate <= threeDaysFromNow
+        switch (Client.getCurrentEndDate(client), client.activatedAt, client.status) {
+          case (?endDate, ?_, #active) {
+            endDate > Time.now() and endDate <= tenDaysFromNow
           };
-          case (null) { false };
+          case (_, _, _) { false };
         };
       }
     );
@@ -562,6 +663,13 @@ actor {
     };
   };
 
+  // New: optimized query to return initial app data
+  public query ({ caller }) func getAppInitData() : async AppInitData {
+    let clientSummaries = clients.toArray().map(func((_, client)) { convertToClientSummary(client) });
+    let userProfile = userProfiles.get(caller);
+    { clientSummaries; userProfile };
+  };
+
   func trapNotFound(item : Text) : () {
     Runtime.trap(item # " not found");
   };
@@ -593,19 +701,17 @@ actor {
       code = client.code;
       name = client.name;
       mobileNumber = client.mobileNumber;
-      planDurationDays = client.planDurationDays;
       notes = client.notes;
       status = client.status;
       onboardingState = client.onboardingState;
       progress = client.progress;
       pauseTime = client.pauseTime;
       totalPausedDuration = client.totalPausedDuration;
-      startDate = client.startDate;
-      endDate = client.endDate;
-      activatedAt = client.activatedAt;
       pauseEntries = client.pauseEntries;
       followUpDay = client.followUpDay;
       followUpHistory = client.followUpHistory;
+      subscriptions = client.subscriptions;
+      activatedAt = client.activatedAt;
     };
   };
 
@@ -625,14 +731,20 @@ actor {
       code = client.code;
       name = client.name;
       mobileNumber = client.mobileNumber;
-      planDurationDays = client.planDurationDays;
       status = client.status;
       onboardingState = client.onboardingState;
       pauseTime = client.pauseTime;
-      startDate = client.startDate;
-      endDate = client.endDate;
-      activatedAt = client.activatedAt;
       followUpDay = client.followUpDay;
+      subscriptionSummary = Client.getCurrentSubscription(client).map(func(sub) {
+        {
+          planDurationDays = sub.planDurationDays;
+          extraDays = sub.extraDays;
+          startDate = sub.startDate;
+          endDate = sub.endDate;
+        };
+      });
+      activatedAt = client.activatedAt;
     };
   };
 };
+

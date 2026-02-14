@@ -8,16 +8,6 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const Time = IDL.Int;
-export const FollowUpDay = IDL.Variant({
-  'tuesday' : IDL.Null,
-  'wednesday' : IDL.Null,
-  'saturday' : IDL.Null,
-  'thursday' : IDL.Null,
-  'sunday' : IDL.Null,
-  'friday' : IDL.Null,
-  'monday' : IDL.Null,
-});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -27,15 +17,32 @@ export const OnboardingState = IDL.Variant({
   'full' : IDL.Null,
   'half' : IDL.Null,
 });
+export const Time = IDL.Int;
 export const ClientStatus = IDL.Variant({
   'active' : IDL.Null,
   'paused' : IDL.Null,
+});
+export const Subscription = IDL.Record({
+  'endDate' : Time,
+  'createdAt' : Time,
+  'extraDays' : IDL.Nat,
+  'planDurationDays' : IDL.Nat,
+  'startDate' : Time,
 });
 export const PauseEntry = IDL.Record({
   'durationDays' : IDL.Nat,
   'resumed' : IDL.Bool,
   'timestamp' : Time,
   'reason' : IDL.Text,
+});
+export const FollowUpDay = IDL.Variant({
+  'tuesday' : IDL.Null,
+  'wednesday' : IDL.Null,
+  'saturday' : IDL.Null,
+  'thursday' : IDL.Null,
+  'sunday' : IDL.Null,
+  'friday' : IDL.Null,
+  'monday' : IDL.Null,
 });
 export const FollowUpEntry = IDL.Record({
   'done' : IDL.Bool,
@@ -54,8 +61,8 @@ export const ClientProgress = IDL.Record({
 });
 export const ExtendedClient = IDL.Record({
   'status' : ClientStatus,
+  'subscriptions' : IDL.Vec(Subscription),
   'pauseEntries' : IDL.Vec(PauseEntry),
-  'endDate' : IDL.Opt(Time),
   'activatedAt' : IDL.Opt(Time),
   'code' : IDL.Nat,
   'name' : IDL.Text,
@@ -63,31 +70,36 @@ export const ExtendedClient = IDL.Record({
   'totalPausedDuration' : IDL.Int,
   'mobileNumber' : IDL.Text,
   'followUpHistory' : IDL.Vec(FollowUpEntry),
-  'planDurationDays' : IDL.Nat,
   'progress' : IDL.Vec(ClientProgress),
   'notes' : IDL.Text,
   'followUpDay' : IDL.Opt(FollowUpDay),
   'onboardingState' : OnboardingState,
-  'startDate' : IDL.Opt(Time),
+});
+export const SubscriptionSummary = IDL.Record({
+  'endDate' : Time,
+  'extraDays' : IDL.Nat,
+  'planDurationDays' : IDL.Nat,
+  'startDate' : Time,
 });
 export const ClientSummary = IDL.Record({
   'status' : ClientStatus,
-  'endDate' : IDL.Opt(Time),
   'activatedAt' : IDL.Opt(Time),
   'code' : IDL.Nat,
   'name' : IDL.Text,
   'pauseTime' : IDL.Opt(Time),
   'mobileNumber' : IDL.Text,
-  'planDurationDays' : IDL.Nat,
+  'subscriptionSummary' : IDL.Opt(SubscriptionSummary),
   'followUpDay' : IDL.Opt(FollowUpDay),
   'onboardingState' : OnboardingState,
-  'startDate' : IDL.Opt(Time),
 });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const AppInitData = IDL.Record({
+  'userProfile' : IDL.Opt(UserProfile),
+  'clientSummaries' : IDL.Vec(ClientSummary),
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'activateClient' : IDL.Func([IDL.Nat, Time, FollowUpDay], [], []),
   'addProgress' : IDL.Func(
       [
         IDL.Nat,
@@ -103,10 +115,16 @@ export const idlService = IDL.Service({
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createClient' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Nat, IDL.Text, OnboardingState],
+      [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
       [IDL.Nat],
       [],
     ),
+  'createOrRenewSubscription' : IDL.Func(
+      [IDL.Nat, IDL.Nat, IDL.Nat, Time],
+      [],
+      [],
+    ),
+  'expireMembershipImmediately' : IDL.Func([IDL.Nat], [], []),
   'filterClientsByOnboardingState' : IDL.Func(
       [OnboardingState],
       [IDL.Vec(ExtendedClient)],
@@ -129,6 +147,7 @@ export const idlService = IDL.Service({
       ],
       ['query'],
     ),
+  'getAppInitData' : IDL.Func([], [AppInitData], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getClientByCode' : IDL.Func([IDL.Nat], [IDL.Opt(ExtendedClient)], ['query']),
@@ -141,6 +160,11 @@ export const idlService = IDL.Service({
   'getClientsByFollowUpDay' : IDL.Func(
       [FollowUpDay],
       [IDL.Vec(ExtendedClient)],
+      ['query'],
+    ),
+  'getCurrentSubscription' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Opt(SubscriptionSummary)],
       ['query'],
     ),
   'getExpiringClients' : IDL.Func([], [IDL.Vec(ExtendedClient)], ['query']),
@@ -181,7 +205,30 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const UserRole = IDL.Variant({
+    'admin' : IDL.Null,
+    'user' : IDL.Null,
+    'guest' : IDL.Null,
+  });
+  const OnboardingState = IDL.Variant({ 'full' : IDL.Null, 'half' : IDL.Null });
   const Time = IDL.Int;
+  const ClientStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'paused' : IDL.Null,
+  });
+  const Subscription = IDL.Record({
+    'endDate' : Time,
+    'createdAt' : Time,
+    'extraDays' : IDL.Nat,
+    'planDurationDays' : IDL.Nat,
+    'startDate' : Time,
+  });
+  const PauseEntry = IDL.Record({
+    'durationDays' : IDL.Nat,
+    'resumed' : IDL.Bool,
+    'timestamp' : Time,
+    'reason' : IDL.Text,
+  });
   const FollowUpDay = IDL.Variant({
     'tuesday' : IDL.Null,
     'wednesday' : IDL.Null,
@@ -190,22 +237,6 @@ export const idlFactory = ({ IDL }) => {
     'sunday' : IDL.Null,
     'friday' : IDL.Null,
     'monday' : IDL.Null,
-  });
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'user' : IDL.Null,
-    'guest' : IDL.Null,
-  });
-  const OnboardingState = IDL.Variant({ 'full' : IDL.Null, 'half' : IDL.Null });
-  const ClientStatus = IDL.Variant({
-    'active' : IDL.Null,
-    'paused' : IDL.Null,
-  });
-  const PauseEntry = IDL.Record({
-    'durationDays' : IDL.Nat,
-    'resumed' : IDL.Bool,
-    'timestamp' : Time,
-    'reason' : IDL.Text,
   });
   const FollowUpEntry = IDL.Record({
     'done' : IDL.Bool,
@@ -224,8 +255,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const ExtendedClient = IDL.Record({
     'status' : ClientStatus,
+    'subscriptions' : IDL.Vec(Subscription),
     'pauseEntries' : IDL.Vec(PauseEntry),
-    'endDate' : IDL.Opt(Time),
     'activatedAt' : IDL.Opt(Time),
     'code' : IDL.Nat,
     'name' : IDL.Text,
@@ -233,31 +264,36 @@ export const idlFactory = ({ IDL }) => {
     'totalPausedDuration' : IDL.Int,
     'mobileNumber' : IDL.Text,
     'followUpHistory' : IDL.Vec(FollowUpEntry),
-    'planDurationDays' : IDL.Nat,
     'progress' : IDL.Vec(ClientProgress),
     'notes' : IDL.Text,
     'followUpDay' : IDL.Opt(FollowUpDay),
     'onboardingState' : OnboardingState,
-    'startDate' : IDL.Opt(Time),
+  });
+  const SubscriptionSummary = IDL.Record({
+    'endDate' : Time,
+    'extraDays' : IDL.Nat,
+    'planDurationDays' : IDL.Nat,
+    'startDate' : Time,
   });
   const ClientSummary = IDL.Record({
     'status' : ClientStatus,
-    'endDate' : IDL.Opt(Time),
     'activatedAt' : IDL.Opt(Time),
     'code' : IDL.Nat,
     'name' : IDL.Text,
     'pauseTime' : IDL.Opt(Time),
     'mobileNumber' : IDL.Text,
-    'planDurationDays' : IDL.Nat,
+    'subscriptionSummary' : IDL.Opt(SubscriptionSummary),
     'followUpDay' : IDL.Opt(FollowUpDay),
     'onboardingState' : OnboardingState,
-    'startDate' : IDL.Opt(Time),
   });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const AppInitData = IDL.Record({
+    'userProfile' : IDL.Opt(UserProfile),
+    'clientSummaries' : IDL.Vec(ClientSummary),
+  });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-    'activateClient' : IDL.Func([IDL.Nat, Time, FollowUpDay], [], []),
     'addProgress' : IDL.Func(
         [
           IDL.Nat,
@@ -273,10 +309,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createClient' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Nat, IDL.Text, OnboardingState],
+        [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
         [IDL.Nat],
         [],
       ),
+    'createOrRenewSubscription' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Nat, Time],
+        [],
+        [],
+      ),
+    'expireMembershipImmediately' : IDL.Func([IDL.Nat], [], []),
     'filterClientsByOnboardingState' : IDL.Func(
         [OnboardingState],
         [IDL.Vec(ExtendedClient)],
@@ -299,6 +341,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
+    'getAppInitData' : IDL.Func([], [AppInitData], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getClientByCode' : IDL.Func(
@@ -315,6 +358,11 @@ export const idlFactory = ({ IDL }) => {
     'getClientsByFollowUpDay' : IDL.Func(
         [FollowUpDay],
         [IDL.Vec(ExtendedClient)],
+        ['query'],
+      ),
+    'getCurrentSubscription' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Opt(SubscriptionSummary)],
         ['query'],
       ),
     'getExpiringClients' : IDL.Func([], [IDL.Vec(ExtendedClient)], ['query']),

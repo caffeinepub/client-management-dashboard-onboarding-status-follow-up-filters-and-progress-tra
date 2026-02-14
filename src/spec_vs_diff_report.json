@@ -1,48 +1,59 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T20:58:56.169Z",
-  "summary": "Diff implements new frontend summary-based queries and updates Dashboard/Clients list to use them, plus status utilities to support both summary and full client types. However, the backend changes shown do not provide clear evidence of the required new ClientSummary type and summary query APIs, and the startup refetch-storm fix in useActor.ts is not evidenced. There are also unrelated feature changes (user profiles and onboarding UX) not requested.",
+  "generatedAt": "2026-02-14T21:52:16.391Z",
+  "summary": "Diff implements a new initial-load timing utility + optional debug panel, adds a combined frontend init query (useGetAppInitData) with caching, and updates App.tsx to render the app shell with in-content loading/error+Retry states. However, key requested timings (actor creation + access-control init) are not evidenced, actor-change refetch storm fix is not shown in useActor.ts, and the backend combined init method is not evidenced in backend/main.mo.",
   "missing_requirements": [
     {
       "id": "REQ-1",
-      "requirement": "Backend defines a new public lightweight ClientSummary type excluding progress/pauseEntries/followUpHistory, and exposes a new query method returning all client summaries in one call with access rules consistent with existing APIs, while keeping existing endpoints unchanged.",
-      "reason": "Frontend now calls summary endpoints (getActivatedClientSummaries/getNonActivatedClientSummaries) and imports ClientSummary, but the provided backend diff snippet is truncated and does not show a public ClientSummary type or the required query method(s). The new endpoints are not visible in the backend evidence provided.",
+      "requirement": "Instrument initial-load timings for actor creation start/end and `_initializeAccessControlWithSecret` start/end, and include them in a single clearly labeled console timing report.",
+      "reason": "The diff shows timing events for `app-init-data-fetch` and `profile-fetch`, but no evidence of timing instrumentation around actor creation or `_initializeAccessControlWithSecret` (nor explicit start/end labels for those steps).",
       "evidence": [
-        "backend/main.mo (truncated)",
-        "frontend/src/hooks/useQueries.ts (calls actor.getActivatedClientSummaries() / actor.getNonActivatedClientSummaries())"
+        "frontend/src/utils/initialLoadTimings.ts",
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    },
+    {
+      "id": "REQ-1",
+      "requirement": "Record timestamps and durations for the first `clientSummaries` fetch start/end as part of initial-load timings.",
+      "reason": "The diff shows seeding client summaries from `getAppInitData()` and timing for `app-init-data-fetch`, but no evidence of a dedicated first `clientSummaries` fetch timing start/end event (and the `useGetClientSummaries` implementation is truncated, so it cannot be confirmed).",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
       ]
     },
     {
       "id": "REQ-2",
-      "requirement": "React Query caches for summaries and full clients are kept consistent (mutations that change client fields invalidate/refetch the summary list cache as needed).",
-      "reason": "While new summary hooks and page usage are present, the diff excerpt does not show mutations (e.g., activate/pause/edit client) invalidating/refetching the ['clientSummaries', identityKey] cache. Only the user profile mutation shows invalidation for ['currentUserProfile', identityKey].",
+      "requirement": "Adjust actor-change invalidation behavior in `frontend/src/hooks/useActor.ts` so dependent queries are not force-refetched multiple times; invalidate once and allow normal refetching; identity changes still clear stale data and refetch correctly.",
+      "reason": "The diff does not show any modification to `frontend/src/hooks/useActor.ts` (the file is not listed as modified). A new `useActorReady` wrapper exists, but it is not the requested change location and does not itself demonstrate fixing actor-change invalidation storms.",
       "evidence": [
-        "frontend/src/hooks/useQueries.ts (shows invalidateQueries only for currentUserProfile; summary cache invalidation not evidenced in truncated content)"
+        "frontend/src/hooks/useActorReady.ts",
+        "frontend-file-summaries.txt"
       ]
     },
     {
-      "id": "REQ-3",
-      "requirement": "Remove any unconditional broad refetch-all behavior tied to actor creation/identity changes (frontend/src/hooks/useActor.ts should not refetch all non-actor queries when actor becomes available).",
-      "reason": "No change to frontend/src/hooks/useActor.ts is shown in the diff summary (it is not listed among modified files), so there is no evidence the refetch-storm behavior was removed or narrowed.",
+      "id": "REQ-4",
+      "requirement": "Backend exposes a new query method that returns both caller profile and dashboard client summaries in one response payload (e.g., `getAppInitData`).",
+      "reason": "Frontend calls `actor.getAppInitData()`, but the backend diff shown for `backend/main.mo` is truncated and does not provide evidence that such a method was added/exposed.",
       "evidence": [
-        "File diff summary: no entry for frontend/src/hooks/useActor.ts"
+        "frontend/src/hooks/useQueries.ts",
+        "backend/main.mo"
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "requirement": "Set appropriate React Query `staleTime`/`gcTime` for the client summaries query to avoid refetching repeatedly during the first minute unless identity changes or explicit invalidation occurs.",
+      "reason": "`staleTime`/`gcTime` are shown for `useGetAppInitData` and `useGetCallerUserProfile`, but `useGetClientSummaries` is truncated, so there is no clear evidence that the client summaries query itself is configured as required.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Added backend user profile APIs (UserProfile type plus getCallerUserProfile/getUserProfile/saveCallerUserProfile) unrelated to client-summary fetching performance requirements.",
-      "reason": "BuildRequest does not ask for user profiles or profile persistence endpoints; these appear as new/changed backend functionality beyond the specified scope.",
+      "description": "Error UI displays the underlying error message (potentially technical) in addition to a non-technical message.",
+      "reason": "REQ-3/AC asks for a non-technical error message; exposing `error.message` is an additional behavior not requested and may violate the intent of ‘non-technical’.",
       "evidence": [
-        "backend/main.mo (truncated: UserProfile type and related methods)"
-      ]
-    },
-    {
-      "description": "Changed onboarding UX: removed follow-up day selection on OnboardClientPage and added a note about activation being required to set follow-up day.",
-      "reason": "BuildRequest explicitly focuses on load-time/data-fetch performance and states non-goals include unrelated product features/UI redesign; this is a behavioral/UX change not requested.",
-      "evidence": [
-        "frontend-file-summaries.txt (OnboardClientPage: follow-up day selection removed and note added)"
+        "frontend/src/App.tsx"
       ]
     }
   ],
@@ -50,10 +61,12 @@
   "changed_files": [
     "backend/main.mo",
     "frontend-file-summaries.txt",
+    "frontend/src/App.tsx",
+    "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+    "frontend/src/hooks/useActorReady.ts",
     "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/ClientsListPage.tsx",
     "frontend/src/pages/DashboardPage.tsx",
-    "frontend/src/utils/status.ts",
+    "frontend/src/utils/initialLoadTimings.ts",
     "project_state.json"
   ]
 }

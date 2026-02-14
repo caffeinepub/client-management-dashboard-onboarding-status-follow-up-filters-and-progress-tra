@@ -7,14 +7,9 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface ClientProgress {
-    thighInch: number;
-    chestInch: number;
-    neckInch: number;
-    hipsInch: number;
-    weightKg: number;
-    timestamp: Time;
-    waistInch: number;
+export interface AppInitData {
+    userProfile?: UserProfile;
+    clientSummaries: Array<ClientSummary>;
 }
 export type Time = bigint;
 export interface FollowUpEntry {
@@ -29,23 +24,43 @@ export interface PauseEntry {
     timestamp: Time;
     reason: string;
 }
+export interface Subscription {
+    endDate: Time;
+    createdAt: Time;
+    extraDays: bigint;
+    planDurationDays: bigint;
+    startDate: Time;
+}
+export interface SubscriptionSummary {
+    endDate: Time;
+    extraDays: bigint;
+    planDurationDays: bigint;
+    startDate: Time;
+}
+export interface ClientProgress {
+    thighInch: number;
+    chestInch: number;
+    neckInch: number;
+    hipsInch: number;
+    weightKg: number;
+    timestamp: Time;
+    waistInch: number;
+}
 export interface ClientSummary {
     status: ClientStatus;
-    endDate?: Time;
     activatedAt?: Time;
     code: bigint;
     name: string;
     pauseTime?: Time;
     mobileNumber: string;
-    planDurationDays: bigint;
+    subscriptionSummary?: SubscriptionSummary;
     followUpDay?: FollowUpDay;
     onboardingState: OnboardingState;
-    startDate?: Time;
 }
 export interface ExtendedClient {
     status: ClientStatus;
+    subscriptions: Array<Subscription>;
     pauseEntries: Array<PauseEntry>;
-    endDate?: Time;
     activatedAt?: Time;
     code: bigint;
     name: string;
@@ -53,12 +68,10 @@ export interface ExtendedClient {
     totalPausedDuration: bigint;
     mobileNumber: string;
     followUpHistory: Array<FollowUpEntry>;
-    planDurationDays: bigint;
     progress: Array<ClientProgress>;
     notes: string;
     followUpDay?: FollowUpDay;
     onboardingState: OnboardingState;
-    startDate?: Time;
 }
 export interface UserProfile {
     name: string;
@@ -86,10 +99,11 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    activateClient(clientCode: bigint, startDate: Time, followUpDay: FollowUpDay): Promise<void>;
     addProgress(clientCode: bigint, weightKg: number, neckInch: number, chestInch: number, waistInch: number, hipsInch: number, thighInch: number): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    createClient(name: string, mobileNumber: string, planDurationDays: bigint, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
+    createClient(name: string, mobileNumber: string, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
+    createOrRenewSubscription(clientCode: bigint, planDurationDays: bigint, extraDays: bigint, startDate: Time): Promise<void>;
+    expireMembershipImmediately(clientCode: bigint): Promise<void>;
     filterClientsByOnboardingState(state: OnboardingState): Promise<Array<ExtendedClient>>;
     getActivatedClientSummaries(): Promise<Array<ClientSummary>>;
     getAllClients(): Promise<Array<ExtendedClient>>;
@@ -98,12 +112,14 @@ export interface backendInterface {
         halfOnboardedClients: Array<ExtendedClient>;
         activatedClients: Array<ExtendedClient>;
     }>;
+    getAppInitData(): Promise<AppInitData>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getClientByCode(clientCode: bigint): Promise<ExtendedClient | null>;
     getClientProgress(clientCode: bigint): Promise<Array<ClientProgress>>;
     getClientSummaries(): Promise<Array<ClientSummary>>;
     getClientsByFollowUpDay(day: FollowUpDay): Promise<Array<ExtendedClient>>;
+    getCurrentSubscription(clientCode: bigint): Promise<SubscriptionSummary | null>;
     getExpiringClients(): Promise<Array<ExtendedClient>>;
     getFollowUpHistory(clientCode: bigint): Promise<Array<FollowUpEntry>>;
     getNonActivatedClientSummaries(): Promise<{

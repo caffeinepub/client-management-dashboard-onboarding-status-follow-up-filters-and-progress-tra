@@ -1,13 +1,15 @@
 import { Suspense, lazy, useState } from 'react';
 import { useRouter } from '../hooks/useRouter';
-import { useGetClient, useGetClientProgress, useActivateClient, usePauseClient } from '../hooks/useQueries';
+import { useGetClient, useGetClientProgress, useActivateClient, usePauseClient, useRenewSubscription, useExpireMembershipImmediately } from '../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Phone, Calendar, FileText, Download } from 'lucide-react';
+import { ArrowLeft, Phone, Calendar, FileText, Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ClientStatusBadge } from '../components/clients/ClientStatusBadge';
 import { ActivateClientDialog } from '../components/clients/ActivateClientDialog';
 import { PauseClientDialog } from '../components/clients/PauseClientDialog';
+import { RenewSubscriptionDialog } from '../components/clients/RenewSubscriptionDialog';
+import { SubscriptionsSection } from '../components/clients/SubscriptionsSection';
 import { ProgressEntryForm } from '../components/progress/ProgressEntryForm';
 import { ProgressHistoryTable } from '../components/progress/ProgressHistoryTable';
 import { FollowUpSection } from '../components/clients/FollowUpSection';
@@ -17,6 +19,16 @@ import { formatClientCode } from '../utils/clientCode';
 import { toast } from 'sonner';
 import { normalizeError } from '../utils/errors';
 import type { FollowUpDay } from '../backend';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 // Lazy load heavy components
 const ProgressCharts = lazy(() => 
@@ -34,9 +46,13 @@ export function ClientProfilePage() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showPauseDialog, setShowPauseDialog] = useState(false);
+  const [showRenewDialog, setShowRenewDialog] = useState(false);
+  const [showExpireDialog, setShowExpireDialog] = useState(false);
   
   const activateClient = useActivateClient();
   const pauseClient = usePauseClient();
+  const renewSubscription = useRenewSubscription();
+  const expireMembership = useExpireMembershipImmediately();
 
   const handleActivate = async (startDate: Date, followUpDay: FollowUpDay) => {
     if (!client) return;
@@ -73,6 +89,38 @@ export function ClientProfilePage() {
     }
   };
 
+  const handleRenew = async (planDurationDays: number, extraDays: number, startDate: Date) => {
+    if (!client) return;
+    
+    try {
+      const startTimestamp = BigInt(startDate.getTime() * 1_000_000);
+      await renewSubscription.mutateAsync({
+        clientCode: client.code,
+        planDurationDays: BigInt(planDurationDays),
+        extraDays: BigInt(extraDays),
+        startDate: startTimestamp,
+      });
+      toast.success('Subscription renewed successfully!');
+      setShowRenewDialog(false);
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Renewal error:', error);
+    }
+  };
+
+  const handleExpireMembership = async () => {
+    if (!client) return;
+    
+    try {
+      await expireMembership.mutateAsync(client.code);
+      toast.success('Membership expired successfully!');
+      setShowExpireDialog(false);
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Expire membership error:', error);
+    }
+  };
+
   if (clientLoading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -96,6 +144,11 @@ export function ClientProfilePage() {
 
   const displayStatus = getDisplayStatus(client);
   const activated = isClientActivated(client);
+  
+  // Get current subscription details
+  const currentSubscription = client.subscriptions && client.subscriptions.length > 0
+    ? client.subscriptions[client.subscriptions.length - 1]
+    : null;
 
   return (
     <div className="space-y-6">
@@ -143,21 +196,27 @@ export function ClientProfilePage() {
             <CardTitle>Plan Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Duration:</span>
-              <span className="font-medium">{client.planDurationDays.toString()} days</span>
-            </div>
-            {client.startDate && (
+            {currentSubscription ? (
               <>
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Plan Duration:</span>
+                  <span className="font-medium">{currentSubscription.planDurationDays.toString()} days</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Extra Days:</span>
+                  <span className="font-medium">{currentSubscription.extraDays.toString()} days</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Start Date:</span>
-                  <span className="font-medium">{formatDate(client.startDate)}</span>
+                  <span className="font-medium">{formatDate(currentSubscription.startDate)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">End Date:</span>
-                  <span className="font-medium">{client.endDate ? formatDate(client.endDate) : 'N/A'}</span>
+                  <span className="font-medium">{formatDate(currentSubscription.endDate)}</span>
                 </div>
               </>
+            ) : (
+              <p className="text-muted-foreground text-sm">No active subscription</p>
             )}
             {!activated && (
               <div className="pt-2">
@@ -166,10 +225,24 @@ export function ClientProfilePage() {
                 </Button>
               </div>
             )}
-            {activated && client.status === 'active' && (
-              <div className="pt-2">
-                <Button onClick={() => setShowPauseDialog(true)} variant="outline" className="w-full">
-                  Pause Client
+            {activated && (
+              <div className="pt-2 space-y-2">
+                {client.status === 'active' && (
+                  <Button onClick={() => setShowPauseDialog(true)} variant="outline" className="w-full">
+                    Pause Client
+                  </Button>
+                )}
+                <Button onClick={() => setShowRenewDialog(true)} variant="default" className="w-full">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Renew Subscription
+                </Button>
+                <Button 
+                  onClick={() => setShowExpireDialog(true)} 
+                  variant="destructive" 
+                  className="w-full"
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Expire Membership
                 </Button>
               </div>
             )}
@@ -179,6 +252,11 @@ export function ClientProfilePage() {
 
       {activated && (
         <>
+          <SubscriptionsSection 
+            subscriptions={client.subscriptions || []} 
+            isLoading={clientLoading}
+          />
+
           <FollowUpSection client={client} />
 
           <Tabs defaultValue="progress" className="space-y-4">
@@ -265,6 +343,36 @@ export function ClientProfilePage() {
         onConfirm={handlePause}
         isLoading={pauseClient.isPending}
       />
+
+      <RenewSubscriptionDialog
+        open={showRenewDialog}
+        onOpenChange={setShowRenewDialog}
+        onConfirm={handleRenew}
+        isLoading={renewSubscription.isPending}
+      />
+
+      <AlertDialog open={showExpireDialog} onOpenChange={setShowExpireDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Expire Membership Immediately?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will immediately expire the client's current membership. The subscription end date will be set to now, and the client status will change to "Expired". This is typically used in absconding cases.
+              <br /><br />
+              Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={expireMembership.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleExpireMembership}
+              disabled={expireMembership.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {expireMembership.isPending ? 'Expiring...' : 'Expire Membership'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

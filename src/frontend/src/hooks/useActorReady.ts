@@ -4,7 +4,7 @@ import { useActor } from './useActor';
 /**
  * Wrapper hook that provides an "actorReady" signal.
  * This signal becomes true on the next tick after the actor becomes available,
- * preventing queries from mounting during actor-change invalidation/refetch windows.
+ * preventing queries from mounting during actor-change invalidation windows.
  */
 export function useActorReady() {
   const { actor, isFetching } = useActor();

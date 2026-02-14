@@ -28,101 +28,82 @@ const onboardingStates: { value: OnboardingState; label: string; description: st
   },
 ];
 
-const monthPresets = [1, 2, 3, 6, 9, 12];
-
 export function OnboardClientPage() {
-  const [name, setName] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [selectedMonths, setSelectedMonths] = useState<number>(1);
-  const [additionalDays, setAdditionalDays] = useState('0');
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>(OnboardingState.half);
-  const [notes, setNotes] = useState('');
-  const [createdClientCode, setCreatedClientCode] = useState<string | null>(null);
-
-  const createClient = useCreateClient();
   const { navigate } = useRouter();
+  const createClient = useCreateClient();
+
+  const [formData, setFormData] = useState({
+    name: '',
+    mobileNumber: '',
+    notes: '',
+    onboardingState: OnboardingState.half,
+  });
+
+  const [createdClientCode, setCreatedClientCode] = useState<bigint | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim()) {
+    if (!formData.name.trim()) {
       toast.error('Please enter client name');
       return;
     }
-    if (!mobileNumber.trim()) {
+
+    if (!formData.mobileNumber.trim()) {
       toast.error('Please enter mobile number');
       return;
     }
 
-    const additionalDaysNum = parseInt(additionalDays) || 0;
-    if (additionalDaysNum < 0) {
-      toast.error('Additional days cannot be negative');
-      return;
-    }
-
     try {
-      const totalDays = computeTotalPlanDays(selectedMonths, additionalDaysNum);
-      
       const clientCode = await createClient.mutateAsync({
-        name: name.trim(),
-        mobileNumber: mobileNumber.trim(),
-        planDurationDays: BigInt(totalDays),
-        notes: notes.trim(),
-        initialOnboardingState: onboardingState,
+        name: formData.name.trim(),
+        mobileNumber: formData.mobileNumber.trim(),
+        notes: formData.notes.trim(),
+        onboardingState: formData.onboardingState,
       });
 
-      setCreatedClientCode(clientCode.toString());
+      setCreatedClientCode(clientCode);
       toast.success('Client onboarded successfully!');
     } catch (error) {
       toast.error(normalizeError(error));
-      console.error('Client creation error:', error);
+      console.error('Onboarding error:', error);
     }
   };
 
   const handleReset = () => {
-    setName('');
-    setMobileNumber('');
-    setSelectedMonths(1);
-    setAdditionalDays('0');
-    setOnboardingState(OnboardingState.half);
-    setNotes('');
+    setFormData({
+      name: '',
+      mobileNumber: '',
+      notes: '',
+      onboardingState: OnboardingState.half,
+    });
     setCreatedClientCode(null);
   };
 
-  const totalDays = computeTotalPlanDays(selectedMonths, parseInt(additionalDays) || 0);
-
-  if (createdClientCode) {
+  if (createdClientCode !== null) {
     return (
       <div className="max-w-2xl mx-auto">
-        <Card className="border-primary/20">
+        <Card>
           <CardContent className="pt-12 pb-12">
             <div className="text-center space-y-6">
-              <div className="flex justify-center">
-                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-8 w-8 text-primary" />
-                </div>
+              <div className="h-16 w-16 rounded-full bg-green-600/10 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold mb-2">Client Onboarded Successfully!</h2>
                 <p className="text-muted-foreground">
-                  The client has been added to your system with the following code:
-                </p>
-              </div>
-              <div className="bg-accent/50 rounded-lg p-6 border-2 border-primary/20">
-                <p className="text-sm text-muted-foreground mb-1">Client Code</p>
-                <p className="text-4xl font-bold text-primary">{formatClientCode(createdClientCode)}</p>
-              </div>
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-sm">
-                <p className="text-amber-800 dark:text-amber-200">
-                  <strong>Note:</strong> You'll need to activate this client and set their follow-up day before they appear in the dashboard.
+                  Client code: <span className="font-semibold">{formatClientCode(createdClientCode.toString())}</span>
                 </p>
               </div>
               <div className="flex gap-3 justify-center pt-4">
-                <Button onClick={() => navigate(`client/${createdClientCode}`)}>
+                <Button onClick={() => navigate(`client/${createdClientCode.toString()}`)}>
                   View Client Profile
                 </Button>
                 <Button variant="outline" onClick={handleReset}>
-                  Add Another Client
+                  Onboard Another Client
+                </Button>
+                <Button variant="ghost" onClick={() => navigate('clients')}>
+                  Back to Clients
                 </Button>
               </div>
             </div>
@@ -136,162 +117,121 @@ export function OnboardClientPage() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Onboard New Client</h1>
-        <p className="text-muted-foreground mt-1">Add a new client to your management system</p>
+        <p className="text-muted-foreground mt-1">Add a new client to your fitness program</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary" />
-            Client Information
-          </CardTitle>
-          <CardDescription>
-            Fill in the details below. A unique client code will be generated automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  Client Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="Enter full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={createClient.isPending}
-                />
-              </div>
+      <form onSubmit={handleSubmit}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Client Information
+            </CardTitle>
+            <CardDescription>
+              Enter the client's basic information and onboarding status
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <ScrollArea className="h-[500px] pr-4">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Client Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter client's full name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    disabled={createClient.isPending}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="mobile">
-                  Mobile Number <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="mobile"
-                  type="tel"
-                  placeholder="Enter mobile number"
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
-                  disabled={createClient.isPending}
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mobileNumber">
+                    Mobile Number <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="mobileNumber"
+                    type="tel"
+                    placeholder="Enter mobile number"
+                    value={formData.mobileNumber}
+                    onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                    disabled={createClient.isPending}
+                  />
+                </div>
 
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="onboardingState">
-                  Onboarding Status <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={onboardingState}
-                  onValueChange={(value) => setOnboardingState(value as OnboardingState)}
-                  disabled={createClient.isPending}
-                >
-                  <SelectTrigger id="onboardingState">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {onboardingStates.map((state) => (
-                      <SelectItem key={state.value} value={state.value}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{state.label}</span>
-                          <span className="text-xs text-muted-foreground">{state.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Note: Onboarded clients are not counted as Active until you activate their plan
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboardingState">
+                    Onboarding Status <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.onboardingState}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, onboardingState: value as OnboardingState })
+                    }
+                    disabled={createClient.isPending}
+                  >
+                    <SelectTrigger id="onboardingState">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {onboardingStates.map((state) => (
+                        <SelectItem key={state.value} value={state.value}>
+                          <div>
+                            <div className="font-medium">{state.label}</div>
+                            <div className="text-xs text-muted-foreground">{state.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Note: Activation is required to set the follow-up day and start the plan
+                  </p>
+                </div>
 
-              <div className="space-y-2 sm:col-span-2">
-                <Label>
-                  Plan Duration <span className="text-destructive">*</span>
-                </Label>
-                <ScrollArea className="w-full">
-                  <div className="flex gap-2 pb-2">
-                    {monthPresets.map((months) => (
-                      <Button
-                        key={months}
-                        type="button"
-                        variant={selectedMonths === months ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedMonths(months)}
-                        disabled={createClient.isPending}
-                        className="whitespace-nowrap"
-                      >
-                        {months} {months === 1 ? 'Month' : 'Months'}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes (Optional)</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Add any additional notes about the client..."
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    disabled={createClient.isPending}
+                    rows={4}
+                  />
+                </div>
               </div>
+            </ScrollArea>
 
-              <div className="space-y-2">
-                <Label htmlFor="additionalDays">Additional Days</Label>
-                <Input
-                  id="additionalDays"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={additionalDays}
-                  onChange={(e) => setAdditionalDays(e.target.value)}
-                  disabled={createClient.isPending}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Total Duration</Label>
-                <Input
-                  type="text"
-                  value={`${totalDays} days`}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Add any additional notes about the client..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={createClient.isPending}
-                  rows={3}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button type="submit" disabled={createClient.isPending} className="flex-1">
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                type="submit"
+                disabled={createClient.isPending || !formData.name.trim() || !formData.mobileNumber.trim()}
+                className="flex-1"
+              >
                 {createClient.isPending ? (
                   <>
                     <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                    Creating Client...
+                    Creating...
                   </>
                 ) : (
-                  <>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Onboard Client
-                  </>
+                  'Create Client'
                 )}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleReset}
+                onClick={() => navigate('clients')}
                 disabled={createClient.isPending}
               >
-                Reset
+                Cancel
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </form>
     </div>
   );
 }

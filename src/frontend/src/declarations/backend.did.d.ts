@@ -10,6 +10,10 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface AppInitData {
+  'userProfile' : [] | [UserProfile],
+  'clientSummaries' : Array<ClientSummary>,
+}
 export interface ClientProgress {
   'thighInch' : number,
   'chestInch' : number,
@@ -23,21 +27,19 @@ export type ClientStatus = { 'active' : null } |
   { 'paused' : null };
 export interface ClientSummary {
   'status' : ClientStatus,
-  'endDate' : [] | [Time],
   'activatedAt' : [] | [Time],
   'code' : bigint,
   'name' : string,
   'pauseTime' : [] | [Time],
   'mobileNumber' : string,
-  'planDurationDays' : bigint,
+  'subscriptionSummary' : [] | [SubscriptionSummary],
   'followUpDay' : [] | [FollowUpDay],
   'onboardingState' : OnboardingState,
-  'startDate' : [] | [Time],
 }
 export interface ExtendedClient {
   'status' : ClientStatus,
+  'subscriptions' : Array<Subscription>,
   'pauseEntries' : Array<PauseEntry>,
-  'endDate' : [] | [Time],
   'activatedAt' : [] | [Time],
   'code' : bigint,
   'name' : string,
@@ -45,12 +47,10 @@ export interface ExtendedClient {
   'totalPausedDuration' : bigint,
   'mobileNumber' : string,
   'followUpHistory' : Array<FollowUpEntry>,
-  'planDurationDays' : bigint,
   'progress' : Array<ClientProgress>,
   'notes' : string,
   'followUpDay' : [] | [FollowUpDay],
   'onboardingState' : OnboardingState,
-  'startDate' : [] | [Time],
 }
 export type FollowUpDay = { 'tuesday' : null } |
   { 'wednesday' : null } |
@@ -73,6 +73,19 @@ export interface PauseEntry {
   'timestamp' : Time,
   'reason' : string,
 }
+export interface Subscription {
+  'endDate' : Time,
+  'createdAt' : Time,
+  'extraDays' : bigint,
+  'planDurationDays' : bigint,
+  'startDate' : Time,
+}
+export interface SubscriptionSummary {
+  'endDate' : Time,
+  'extraDays' : bigint,
+  'planDurationDays' : bigint,
+  'startDate' : Time,
+}
 export type Time = bigint;
 export interface UserProfile { 'name' : string }
 export type UserRole = { 'admin' : null } |
@@ -80,16 +93,20 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'activateClient' : ActorMethod<[bigint, Time, FollowUpDay], undefined>,
   'addProgress' : ActorMethod<
     [bigint, number, number, number, number, number, number],
     undefined
   >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createClient' : ActorMethod<
-    [string, string, bigint, string, OnboardingState],
+    [string, string, string, OnboardingState],
     bigint
   >,
+  'createOrRenewSubscription' : ActorMethod<
+    [bigint, bigint, bigint, Time],
+    undefined
+  >,
+  'expireMembershipImmediately' : ActorMethod<[bigint], undefined>,
   'filterClientsByOnboardingState' : ActorMethod<
     [OnboardingState],
     Array<ExtendedClient>
@@ -104,12 +121,14 @@ export interface _SERVICE {
       'activatedClients' : Array<ExtendedClient>,
     }
   >,
+  'getAppInitData' : ActorMethod<[], AppInitData>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getClientByCode' : ActorMethod<[bigint], [] | [ExtendedClient]>,
   'getClientProgress' : ActorMethod<[bigint], Array<ClientProgress>>,
   'getClientSummaries' : ActorMethod<[], Array<ClientSummary>>,
   'getClientsByFollowUpDay' : ActorMethod<[FollowUpDay], Array<ExtendedClient>>,
+  'getCurrentSubscription' : ActorMethod<[bigint], [] | [SubscriptionSummary]>,
   'getExpiringClients' : ActorMethod<[], Array<ExtendedClient>>,
   'getFollowUpHistory' : ActorMethod<[bigint], Array<FollowUpEntry>>,
   'getNonActivatedClientSummaries' : ActorMethod<

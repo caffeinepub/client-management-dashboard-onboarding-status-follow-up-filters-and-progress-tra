@@ -1,89 +1,136 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Reduce startup refetch and switch initial screens to client summaries",
+  "title": "Startup load-time instrumentation and refetch-storm reduction",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Use client summaries as the default React Query dataset for Dashboard/Clients list and fetch full client details only when needed (profile/export).",
+      "id": "REQ-1",
+      "summary": "Add startup timing instrumentation and an optional hidden in-app debug panel to identify where initial-load delays occur.",
       "acceptanceCriteria": [
-        "A new React Query hook is added (in frontend/src/hooks/useQueries.ts) to fetch and cache the client summaries list keyed by identity (similar scoping to the existing ['clients', identityKey] cache).",
-        "Dashboard and Clients list pages are updated to use the client summaries hook for their main list/metrics rendering, avoiding fetching full ExtendedClient records on initial route entry.",
-        "ClientProfilePage continues to fetch full client data by code when routed to a specific client (and still fetches progress via the existing progress query).",
-        "React Query caches for summaries and full clients are kept consistent (e.g., mutations that change client fields invalidate/refetch the summary list cache as needed)."
+        "On a fresh load, the browser console shows a single, clearly labeled timing report for initial load steps (actor, access-control init, profile query, summaries query).",
+        "Timing instrumentation does not appear in normal UI by default (only console, or a hidden toggle such as a URL param).",
+        "Instrumentation does not modify any files under frontend/src/components/ui or other immutablePaths."
       ],
       "file_operations": [
         {
+          "path": "frontend/src/utils/initialLoadTimings.ts",
+          "operation": "create",
+          "description": "Create a lightweight timing/logger utility to record labeled start/end timestamps, compute durations, and emit a single consolidated console report for the initial-load sequence; include support for enabling via a URL param (e.g., debug flag) and exposing a read-only buffer for an optional hidden panel."
+        },
+        {
+          "path": "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+          "operation": "create",
+          "description": "Add an optional hidden UI panel component that renders the captured timing events/durations when enabled via URL param; keep it out of the normal UI by default. Verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/hooks/useActor.ts",
+          "operation": "modify",
+          "description": "Instrument actor creation start/end and access-control initialization (_initializeAccessControlWithSecret) start/end using the new timing utility; ensure the timing report is emitted once per fresh load and remains console-only unless the debug URL flag is present."
+        },
+        {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a new React Query hook that calls the backend capability for client summaries (e.g., getClientSummaries and/or getNonActivatedClientSummaries) and caches results keyed by identity; update existing queries/mutations to (1) avoid using full-client lists for initial rendering and (2) keep summary and full-client caches consistent via targeted invalidation. Also adjust useGetClient to prefer cached summaries for lightweight UI and fetch full details on-demand when visiting a profile."
+          "description": "Instrument getCallerUserProfile start/end and the first client summaries fetch start/end (covering both activated and non-activated summaries, and later the combined init call if used) using the timing utility; ensure instrumentation does not change fetch semantics aside from logging."
         },
         {
-          "path": "frontend/src/utils/status.ts",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Generalize status/activation/metrics helpers so Dashboard and Clients list can compute statuses and metrics from the lightweight ClientSummary shape (without requiring ExtendedClient progress/history arrays)."
-        },
-        {
-          "path": "frontend/src/pages/DashboardPage.tsx",
-          "operation": "modify",
-          "description": "Switch the Dashboard’s initial data usage from full clients to the new client summaries hook for metrics and follow-up list rendering; ensure any derived computations continue to work using summary fields only."
-        },
-        {
-          "path": "frontend/src/pages/ClientsListPage.tsx",
-          "operation": "modify",
-          "description": "Switch the Clients list’s initial data usage from full clients to the new client summaries hook; update filtering/search/count logic to operate on summary fields, while preserving navigation to client profile (which triggers full fetch by code)."
-        },
-        {
-          "path": "frontend/src/pages/ClientProfilePage.tsx",
-          "operation": "modify",
-          "description": "Ensure the client profile route continues to fetch full client details by code (not dependent on initial list fetching), while leaving the existing progress query behavior intact."
+          "description": "Wire the optional InitialLoadDebugPanel into the authenticated app shell in a non-invasive way (only renders when the debug URL flag is present) so timings can be inspected without appearing in the normal UI. Verify the component's usage instructions before implementing."
         }
       ]
     },
     {
-      "id": "REQ-3",
-      "summary": "Remove app-wide refetch storms triggered by actor creation/identity changes so data is fetched only when relevant hooks are mounted.",
+      "id": "REQ-2",
+      "summary": "Stop redundant startup refetch storms by changing actor-change behavior in useActor to invalidate once without immediate multi-refetch cascades.",
       "acceptanceCriteria": [
-        "frontend/src/hooks/useActor.ts no longer triggers an unconditional refetch of all non-actor queries when the actor becomes available (i.e., eliminate or narrowly scope refetchQueries that causes an app-wide refetch storm).",
-        "Queries related to client data do not automatically refetch multiple times during login/actor initialization; they should fetch once when enabled/mounted (unless explicitly invalidated by a mutation).",
-        "No changes are made to immutable frontend paths listed in SYSTEM_CONTEXT."
+        "On first authenticated load, getCallerUserProfile is executed at most once (no duplicate network calls caused by actor initialization side-effects).",
+        "On first authenticated load, getActivatedClientSummaries and getNonActivatedClientSummaries are each executed at most once.",
+        "Changing identity (logout/login) still results in stale data being cleared and fresh data being fetched correctly for the new identity."
       ],
       "file_operations": [
         {
           "path": "frontend/src/hooks/useActor.ts",
           "operation": "modify",
-          "description": "Remove the unconditional non-actor invalidate+refetch behavior tied to actor availability; replace it with a narrowly-scoped cache cleanup strategy (e.g., remove queries tied to the prior identity/actor without triggering immediate refetch) so page-level hooks fetch only when mounted/enabled."
+          "description": "Adjust the actor-change effect to avoid calling refetchQueries for all dependent queries; instead invalidate once (prefer refetchType='active' so only mounted queries refetch) and add a guard so the invalidation runs once per actor/identity change, preventing repeated invalidation loops during startup."
+        },
+        {
+          "path": "frontend/src/hooks/useActorReady.ts",
+          "operation": "modify",
+          "description": "Re-evaluate the delayed actorReady signaling to ensure it still prevents queries from mounting during actor-change invalidation windows after the useActor invalidation/refetch behavior is changed; keep behavior stable across login/logout transitions."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure query keys and enabled conditions remain actor/identity-scoped and do not trigger extra refetches due to actor readiness transitions; rely on invalidation + mounted queries rather than forced refetch storms."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Render the authenticated app shell quickly without blocking on profile fetch; show an English in-content loading and a retry-able error state.",
+      "acceptanceCriteria": [
+        "After authentication, the app shell (navigation/layout) renders quickly and shows an in-content loading state rather than a full-screen block for extended durations.",
+        "User-facing loading text is in English.",
+        "If the profile request errors, the UI shows a non-technical error message and a visible Retry button that re-attempts the profile query."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Change profile gating so ThemeProvider + AppLayout render immediately after authentication; in the main content area render: (1) an English loading state while profile loads, (2) a friendly error message + Retry button on failure, (3) ProfileSetupDialog when profile is confirmed missing, else render routed pages."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Ensure the profile query exposes an actionable refetch for the Retry button and returns correct loading/fetched flags; keep user-facing text English in any surfaced states."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Keep client export working with summary-based list rendering by explicitly fetching full client data only when export needs it, with a clear loading state.",
+      "summary": "Use a single combined backend call for first-screen initial data on startup and update frontend queries to prefer it for initial dashboard load.",
       "acceptanceCriteria": [
-        "ClientsListPage still allows exporting the currently filtered set of clients.",
-        "If export requires fields not present in the summary dataset, the UI triggers an explicit fetch of full client data for export (without blocking initial page render), and shows a clear English loading state while preparing the export.",
-        "Export output remains the same as before for the same selection of export fields."
+        "Backend exposes a new query method that returns both the caller profile and the client summaries needed by the dashboard in one response payload.",
+        "Frontend initial dashboard load uses the new combined method (reducing the number of canister calls required for initial render).",
+        "Existing individual methods (e.g., getCallerUserProfile, getActivatedClientSummaries, getNonActivatedClientSummaries) continue to work for non-initial flows, unless explicitly replaced throughout the app.",
+        "No state migration is introduced unless a persistent data schema change is required (prefer no migration for this performance change)."
       ],
       "file_operations": [
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a dedicated export-preparation capability in the React Query layer (e.g., a mutation) that explicitly fetches the needed full ExtendedClient records for a given set of client codes (using existing backend capabilities), without affecting initial page render; ensure it integrates with identity-scoped caching/invalidation."
+          "description": "Add a new startup query hook that calls the existing combined backend capability (getAppInitData) and seeds React Query caches for both ['currentUserProfile', identityKey] and ['clientSummaries', identityKey] from the single response; ensure this hook is used only for initial authenticated startup and does not break existing individual queries."
         },
         {
-          "path": "frontend/src/pages/ClientsListPage.tsx",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Update export flow to export the currently filtered list when the main dataset is summaries: trigger an explicit full-data fetch for the filtered set (non-blocking to initial render) and pass the resolved ExtendedClient array into the export dialog; show a clear English 'preparing export' loading state while the full data is being gathered."
+          "description": "Use the combined init-data hook during authenticated startup so the first screen can be driven by a single call; keep existing profile setup flow (missing profile) working and ensure the shell still renders immediately while init data is loading."
         },
         {
-          "path": "frontend/src/components/clients/ExportClientsExcelDialog.tsx",
+          "path": "frontend/src/pages/DashboardPage.tsx",
           "operation": "modify",
-          "description": "Extend the dialog to support an export preparation/loading state (English text) and to only allow exporting once full ExtendedClient data is available, keeping the generated Excel output identical to the previous behavior."
+          "description": "Ensure dashboard data usage benefits from caches seeded by the combined init-data call (so initial dashboard render does not require additional calls beyond the combined fetch) while preserving current component behavior."
+        }
+      ]
+    },
+    {
+      "id": "REQ-5",
+      "summary": "Tune React Query caching for startup profile and summaries to prevent unnecessary refetching for the first minute unless identity changes or explicit invalidation occurs.",
+      "acceptanceCriteria": [
+        "Within 60 seconds of app startup (no identity change), navigating between routes does not trigger additional refetches of profile/summaries unless explicitly invalidated by a mutation.",
+        "After a mutation that invalidates summaries (e.g., create client/activate/pause/renew), summaries refetch correctly.",
+        "Caching behavior remains correctly scoped per-identity (no cross-user data leakage)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Set appropriate staleTime/gcTime for the startup-critical queries (current user profile, client summaries, and combined init data if added) and disable eager refetch triggers (e.g., window focus/reconnect/mount) during the first minute; keep identityKey in query keys to scope caches per-identity and ensure existing mutation invalidations still trigger refetch when needed."
         },
         {
-          "path": "frontend/src/utils/clientExportFields.ts",
+          "path": "frontend/src/main.tsx",
           "operation": "modify",
-          "description": "Confirm export field accessors continue to rely on ExtendedClient-only fields (progress/history/pause arrays) so the UI correctly triggers explicit full-data fetch for export when starting from summaries; keep exported values/formatting unchanged."
+          "description": "If needed to enforce consistent startup caching behavior, configure QueryClient defaultOptions for queries (without impacting non-startup flows) to reduce unnecessary refetch triggers during the first minute; keep changes minimal and aligned with the tuned per-query settings."
         }
       ]
     }

@@ -1,14 +1,58 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActorReady } from './useActorReady';
 import { useInternetIdentity } from './useInternetIdentity';
-import type { FollowUpDay, OnboardingState, Time, UserProfile, ExtendedClient, ClientSummary } from '../backend';
-import { isClientActivated } from '../utils/status';
+import type { FollowUpDay, OnboardingState, Time, UserProfile, ExtendedClient, ClientSummary, AppInitData } from '../backend';
+import { isClientActivated, getClientStatus, EXPIRING_WINDOW_DAYS } from '../utils/status';
 import { useMemo } from 'react';
+import { timings } from '../utils/initialLoadTimings';
 
 // Helper to get identity key for query scoping
 function useIdentityKey() {
   const { identity } = useInternetIdentity();
   return identity?.getPrincipal().toString() || 'anonymous';
+}
+
+/**
+ * Combined initial app data fetch - uses backend's getAppInitData for optimal startup.
+ * Seeds both profile and client summaries caches from a single call.
+ */
+export function useGetAppInitData() {
+  const { actor, isFetching: actorFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useQuery<AppInitData>({
+    queryKey: ['appInitData', identityKey],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      
+      timings.start('app-init-data-fetch');
+      const data = await actor.getAppInitData();
+      timings.end('app-init-data-fetch');
+
+      // Seed individual caches from combined response
+      queryClient.setQueryData(['currentUserProfile', identityKey], data.userProfile);
+      
+      // Transform client summaries into the expected format
+      const activated = data.clientSummaries.filter(c => c.activatedAt !== undefined);
+      const half = data.clientSummaries.filter(c => c.onboardingState === 'half' && c.activatedAt === undefined);
+      const full = data.clientSummaries.filter(c => c.onboardingState === 'full' && c.activatedAt === undefined);
+      
+      queryClient.setQueryData(['clientSummaries', identityKey], {
+        activated,
+        half,
+        full,
+      });
+
+      timings.report();
+      
+      return data;
+    },
+    enabled: !!actor && !actorFetching && actorReady,
+    staleTime: 60_000, // 1 minute - prevent refetch during initial navigation
+    gcTime: 5 * 60_000, // 5 minutes
+    retry: 1,
+  });
 }
 
 export function useGetCallerUserProfile() {
@@ -19,10 +63,15 @@ export function useGetCallerUserProfile() {
     queryKey: ['currentUserProfile', identityKey],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.getCallerUserProfile();
+      timings.start('profile-fetch');
+      const profile = await actor.getCallerUserProfile();
+      timings.end('profile-fetch');
+      return profile;
     },
     enabled: !!actor && !actorFetching && actorReady,
-    retry: false,
+    retry: 1,
+    staleTime: 60_000, // 1 minute
+    gcTime: 5 * 60_000, // 5 minutes
   });
 
   return {
@@ -44,6 +93,7 @@ export function useSaveCallerUserProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -61,11 +111,13 @@ export function useGetClientSummaries() {
     queryFn: async () => {
       if (!actor) return { activated: [], half: [], full: [] };
       
+      timings.start('client-summaries-fetch');
       // Fetch both activated and non-activated summaries in parallel
       const [activated, nonActivated] = await Promise.all([
         actor.getActivatedClientSummaries(),
         actor.getNonActivatedClientSummaries(),
       ]);
+      timings.end('client-summaries-fetch');
       
       return {
         activated,
@@ -74,6 +126,8 @@ export function useGetClientSummaries() {
       };
     },
     enabled: !!actor && !isFetching && actorReady,
+    staleTime: 60_000, // 1 minute
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
@@ -118,6 +172,8 @@ export function useGetAllClients() {
       ];
     },
     enabled: !!actor && !isFetching && actorReady,
+    staleTime: 60_000, // 1 minute
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
@@ -145,6 +201,8 @@ export function useGetClient(clientCode: bigint | null) {
       return actor.getClientByCode(clientCode);
     },
     enabled: !!actor && !isFetching && actorReady && clientCode !== null,
+    staleTime: 30_000, // 30 seconds
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
@@ -214,6 +272,8 @@ export function useGetClientsByFollowUpDay(day: FollowUpDay | null) {
 
 /**
  * Derive expiring clients from cached summary data.
+ * Expiring clients are activated, currently active (not paused, not expired),
+ * and have an end date within the next 10 days.
  */
 export function useGetExpiringClients() {
   const { data: allSummaries, isLoading } = useGetAllClientSummaries();
@@ -221,14 +281,24 @@ export function useGetExpiringClients() {
   const expiringClients = useMemo(() => {
     if (!allSummaries) return [];
     
-    // Compute expiring status client-side
-    const threeDaysFromNow = BigInt(Date.now() * 1_000_000) + (3n * 86_400_000_000_000n);
+    // Compute expiring status client-side using 10-day window
     const now = BigInt(Date.now() * 1_000_000);
+    const expiringWindowEnd = now + (BigInt(EXPIRING_WINDOW_DAYS) * 86_400_000_000_000n);
     
     return allSummaries.filter(client => {
-      if (!client.endDate) return false;
-      const endDate = client.endDate;
-      return endDate > now && endDate <= threeDaysFromNow;
+      // Must be activated
+      if (!isClientActivated(client)) return false;
+      
+      // Must have an end date
+      const endDate = client.subscriptionSummary?.endDate;
+      if (!endDate) return false;
+      
+      // Must be currently active (not paused, not expired)
+      const status = getClientStatus(client);
+      if (status !== 'active') return false;
+      
+      // End date must be within the expiring window (> now and <= now + 10 days)
+      return endDate > now && endDate <= expiringWindowEnd;
     });
   }, [allSummaries]);
 
@@ -243,12 +313,14 @@ export function useGetClientProgress(clientCode: bigint | null) {
   const identityKey = useIdentityKey();
 
   return useQuery({
-    queryKey: ['progress', clientCode?.toString(), identityKey],
+    queryKey: ['clientProgress', clientCode?.toString(), identityKey],
     queryFn: async () => {
       if (!actor || !clientCode) return [];
       return actor.getClientProgress(clientCode);
     },
     enabled: !!actor && !isFetching && actorReady && clientCode !== null,
+    staleTime: 30_000, // 30 seconds
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
 
@@ -261,22 +333,111 @@ export function useCreateClient() {
     mutationFn: async (params: {
       name: string;
       mobileNumber: string;
-      planDurationDays: bigint;
       notes: string;
-      initialOnboardingState: OnboardingState;
+      onboardingState: OnboardingState;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.createClient(
         params.name,
         params.mobileNumber,
-        params.planDurationDays,
         params.notes,
-        params.initialOnboardingState
+        params.onboardingState
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
+    },
+  });
+}
+
+export function useActivateClient() {
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      clientCode: bigint;
+      startDate: Time;
+      followUpDay: FollowUpDay;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      
+      // Get the client to extract plan duration
+      const client = await actor.getClientByCode(params.clientCode);
+      if (!client) throw new Error('Client not found');
+      
+      // Use the first subscription's plan duration if it exists, otherwise default to 30 days
+      const planDurationDays = client.subscriptions && client.subscriptions.length > 0
+        ? client.subscriptions[0].planDurationDays
+        : 30n;
+      
+      // Create the initial subscription
+      await actor.createOrRenewSubscription(
+        params.clientCode,
+        planDurationDays,
+        0n, // No extra days for initial activation
+        params.startDate
+      );
+      
+      // Set the follow-up day
+      await actor.setFollowUpDay(params.clientCode, params.followUpDay);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
+    },
+  });
+}
+
+export function useRenewSubscription() {
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      clientCode: bigint;
+      planDurationDays: bigint;
+      extraDays: bigint;
+      startDate: Time;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.createOrRenewSubscription(
+        params.clientCode,
+        params.planDurationDays,
+        params.extraDays,
+        params.startDate
+      );
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
+    },
+  });
+}
+
+export function useExpireMembershipImmediately() {
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientCode: bigint) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.expireMembershipImmediately(clientCode);
+    },
+    onSuccess: (_data, clientCode) => {
+      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -307,8 +468,8 @@ export function useAddProgress() {
         params.thighInch
       );
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['progress', variables.clientCode.toString(), identityKey] });
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['clientProgress', variables.clientCode.toString(), identityKey] });
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
     },
   });
@@ -332,10 +493,11 @@ export function usePauseClient() {
         params.pauseReason
       );
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -350,10 +512,11 @@ export function useResumeClient() {
       if (!actor) throw new Error('Actor not available');
       return actor.resumeClient(clientCode);
     },
-    onSuccess: (_, clientCode) => {
+    onSuccess: (_data, clientCode) => {
       queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -368,32 +531,11 @@ export function useUpdateOnboardingState() {
       if (!actor) throw new Error('Actor not available');
       return actor.updateOnboardingState(params.clientCode, params.state);
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
-    },
-  });
-}
-
-export function useActivateClient() {
-  const { actor } = useActorReady();
-  const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (params: {
-      clientCode: bigint;
-      startDate: Time;
-      followUpDay: FollowUpDay;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.activateClient(params.clientCode, params.startDate, params.followUpDay);
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -418,9 +560,24 @@ export function useRecordFollowUp() {
         params.notes
       );
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
+  });
+}
+
+export function useGetFollowUpHistory(clientCode: bigint | null) {
+  const { actor, isFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
+
+  return useQuery({
+    queryKey: ['followUpHistory', clientCode?.toString(), identityKey],
+    queryFn: async () => {
+      if (!actor || !clientCode) return [];
+      return actor.getFollowUpHistory(clientCode);
+    },
+    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
+    staleTime: 30_000, // 30 seconds
+    gcTime: 5 * 60_000, // 5 minutes
   });
 }
