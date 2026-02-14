@@ -29,6 +29,19 @@ export interface PauseEntry {
     timestamp: Time;
     reason: string;
 }
+export interface ClientSummary {
+    status: ClientStatus;
+    endDate?: Time;
+    activatedAt?: Time;
+    code: bigint;
+    name: string;
+    pauseTime?: Time;
+    mobileNumber: string;
+    planDurationDays: bigint;
+    followUpDay?: FollowUpDay;
+    onboardingState: OnboardingState;
+    startDate?: Time;
+}
 export interface ExtendedClient {
     status: ClientStatus;
     pauseEntries: Array<PauseEntry>;
@@ -78,13 +91,25 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createClient(name: string, mobileNumber: string, planDurationDays: bigint, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
     filterClientsByOnboardingState(state: OnboardingState): Promise<Array<ExtendedClient>>;
+    getActivatedClientSummaries(): Promise<Array<ClientSummary>>;
     getAllClients(): Promise<Array<ExtendedClient>>;
+    getAllClientsAndNonActivatedClients(): Promise<{
+        fullOnboardedClients: Array<ExtendedClient>;
+        halfOnboardedClients: Array<ExtendedClient>;
+        activatedClients: Array<ExtendedClient>;
+    }>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getClientByCode(clientCode: bigint): Promise<ExtendedClient | null>;
     getClientProgress(clientCode: bigint): Promise<Array<ClientProgress>>;
+    getClientSummaries(): Promise<Array<ClientSummary>>;
     getClientsByFollowUpDay(day: FollowUpDay): Promise<Array<ExtendedClient>>;
     getExpiringClients(): Promise<Array<ExtendedClient>>;
     getFollowUpHistory(clientCode: bigint): Promise<Array<FollowUpEntry>>;
+    getNonActivatedClientSummaries(): Promise<{
+        fullOnboardedClients: Array<ClientSummary>;
+        halfOnboardedClients: Array<ClientSummary>;
+    }>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     pauseClient(clientCode: bigint, durationDays: bigint, reason: string): Promise<void>;

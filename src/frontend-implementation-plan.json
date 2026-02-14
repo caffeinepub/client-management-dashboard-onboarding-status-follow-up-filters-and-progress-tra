@@ -1,28 +1,89 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Manual 'Mark follow-up done' action on Client Profile follow-up status",
+  "title": "Reduce startup refetch and switch initial screens to client summaries",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Add a manual action button in the Follow-up Status UI to record a 'done' follow-up immediately using the existing follow-up recording flow, with loading/disabled states and error toasts.",
+      "id": "REQ-2",
+      "summary": "Use client summaries as the default React Query dataset for Dashboard/Clients list and fetch full client details only when needed (profile/export).",
       "acceptanceCriteria": [
-        "When viewing an activated client with a configured follow-up day, the Follow-up Status card shows a clear action button to manually mark the follow-up as done.",
-        "Clicking the button records a follow-up entry with status = done for that client (using the existing follow-up recording flow), and the UI updates to show the status as Done.",
-        "After marking as done, the new entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.",
-        "The button is disabled and shows a loading state while the follow-up record mutation is in progress.",
-        "If recording fails, show a user-facing error toast using the app’s existing error normalization/toast patterns."
+        "A new React Query hook is added (in frontend/src/hooks/useQueries.ts) to fetch and cache the client summaries list keyed by identity (similar scoping to the existing ['clients', identityKey] cache).",
+        "Dashboard and Clients list pages are updated to use the client summaries hook for their main list/metrics rendering, avoiding fetching full ExtendedClient records on initial route entry.",
+        "ClientProfilePage continues to fetch full client data by code when routed to a specific client (and still fetches progress via the existing progress query).",
+        "React Query caches for summaries and full clients are kept consistent (e.g., mutations that change client fields invalidate/refetch the summary list cache as needed)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/clients/FollowUpSection.tsx",
+          "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Extend the Follow-up Status card UI to include a prominent manual action button (e.g., 'Mark follow-up done') and support props for triggering the action and reflecting loading/disabled state; keep the existing status indicator and history table behavior intact so the newest entry remains sorted to the top after data refresh."
+          "description": "Add a new React Query hook that calls the backend capability for client summaries (e.g., getClientSummaries and/or getNonActivatedClientSummaries) and caches results keyed by identity; update existing queries/mutations to (1) avoid using full-client lists for initial rendering and (2) keep summary and full-client caches consistent via targeted invalidation. Also adjust useGetClient to prefer cached summaries for lightweight UI and fetch full details on-demand when visiting a profile."
+        },
+        {
+          "path": "frontend/src/utils/status.ts",
+          "operation": "modify",
+          "description": "Generalize status/activation/metrics helpers so Dashboard and Clients list can compute statuses and metrics from the lightweight ClientSummary shape (without requiring ExtendedClient progress/history arrays)."
+        },
+        {
+          "path": "frontend/src/pages/DashboardPage.tsx",
+          "operation": "modify",
+          "description": "Switch the Dashboard’s initial data usage from full clients to the new client summaries hook for metrics and follow-up list rendering; ensure any derived computations continue to work using summary fields only."
+        },
+        {
+          "path": "frontend/src/pages/ClientsListPage.tsx",
+          "operation": "modify",
+          "description": "Switch the Clients list’s initial data usage from full clients to the new client summaries hook; update filtering/search/count logic to operate on summary fields, while preserving navigation to client profile (which triggers full fetch by code)."
         },
         {
           "path": "frontend/src/pages/ClientProfilePage.tsx",
           "operation": "modify",
-          "description": "Wire the manual 'Mark follow-up done' button into the Client Profile page by adding a handler that calls the existing useRecordFollowUp mutation with done=true (and appropriate follow-up day), disables/shows loading while the mutation is pending, closes any open due prompt if applicable, and shows error toasts using normalizeError(...) and the existing toast pattern on failure."
+          "description": "Ensure the client profile route continues to fetch full client details by code (not dependent on initial list fetching), while leaving the existing progress query behavior intact."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Remove app-wide refetch storms triggered by actor creation/identity changes so data is fetched only when relevant hooks are mounted.",
+      "acceptanceCriteria": [
+        "frontend/src/hooks/useActor.ts no longer triggers an unconditional refetch of all non-actor queries when the actor becomes available (i.e., eliminate or narrowly scope refetchQueries that causes an app-wide refetch storm).",
+        "Queries related to client data do not automatically refetch multiple times during login/actor initialization; they should fetch once when enabled/mounted (unless explicitly invalidated by a mutation).",
+        "No changes are made to immutable frontend paths listed in SYSTEM_CONTEXT."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useActor.ts",
+          "operation": "modify",
+          "description": "Remove the unconditional non-actor invalidate+refetch behavior tied to actor availability; replace it with a narrowly-scoped cache cleanup strategy (e.g., remove queries tied to the prior identity/actor without triggering immediate refetch) so page-level hooks fetch only when mounted/enabled."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Keep client export working with summary-based list rendering by explicitly fetching full client data only when export needs it, with a clear loading state.",
+      "acceptanceCriteria": [
+        "ClientsListPage still allows exporting the currently filtered set of clients.",
+        "If export requires fields not present in the summary dataset, the UI triggers an explicit fetch of full client data for export (without blocking initial page render), and shows a clear English loading state while preparing the export.",
+        "Export output remains the same as before for the same selection of export fields."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Add a dedicated export-preparation capability in the React Query layer (e.g., a mutation) that explicitly fetches the needed full ExtendedClient records for a given set of client codes (using existing backend capabilities), without affecting initial page render; ensure it integrates with identity-scoped caching/invalidation."
+        },
+        {
+          "path": "frontend/src/pages/ClientsListPage.tsx",
+          "operation": "modify",
+          "description": "Update export flow to export the currently filtered list when the main dataset is summaries: trigger an explicit full-data fetch for the filtered set (non-blocking to initial render) and pass the resolved ExtendedClient array into the export dialog; show a clear English 'preparing export' loading state while the full data is being gathered."
+        },
+        {
+          "path": "frontend/src/components/clients/ExportClientsExcelDialog.tsx",
+          "operation": "modify",
+          "description": "Extend the dialog to support an export preparation/loading state (English text) and to only allow exporting once full ExtendedClient data is available, keeping the generated Excel output identical to the previous behavior."
+        },
+        {
+          "path": "frontend/src/utils/clientExportFields.ts",
+          "operation": "modify",
+          "description": "Confirm export field accessors continue to rely on ExtendedClient-only fields (progress/history/pause arrays) so the UI correctly triggers explicit full-data fetch for export when starting from summaries; keep exported values/formatting unchanged."
         }
       ]
     }

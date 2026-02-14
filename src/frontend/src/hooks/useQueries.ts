@@ -1,18 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useActor } from './useActor';
-import type { FollowUpDay, OnboardingState, Time, UserProfile } from '../backend';
+import { useActorReady } from './useActorReady';
+import { useInternetIdentity } from './useInternetIdentity';
+import type { FollowUpDay, OnboardingState, Time, UserProfile, ExtendedClient, ClientSummary } from '../backend';
 import { isClientActivated } from '../utils/status';
+import { useMemo } from 'react';
+
+// Helper to get identity key for query scoping
+function useIdentityKey() {
+  const { identity } = useInternetIdentity();
+  return identity?.getPrincipal().toString() || 'anonymous';
+}
 
 export function useGetCallerUserProfile() {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor, isFetching: actorFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
 
   const query = useQuery<UserProfile | null>({
-    queryKey: ['currentUserProfile'],
+    queryKey: ['currentUserProfile', identityKey],
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
       return actor.getCallerUserProfile();
     },
-    enabled: !!actor && !actorFetching,
+    enabled: !!actor && !actorFetching && actorReady,
     retry: false,
   });
 
@@ -24,7 +33,8 @@ export function useGetCallerUserProfile() {
 }
 
 export function useSaveCallerUserProfile() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -33,137 +43,218 @@ export function useSaveCallerUserProfile() {
       return actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile', identityKey] });
     },
   });
 }
 
-export function useGetAllClients() {
-  const { actor, isFetching } = useActor();
+/**
+ * Fetch lightweight client summaries for list views and dashboard.
+ * This is the primary query for initial page loads.
+ */
+export function useGetClientSummaries() {
+  const { actor, isFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
 
   return useQuery({
-    queryKey: ['clients'],
+    queryKey: ['clientSummaries', identityKey],
+    queryFn: async () => {
+      if (!actor) return { activated: [], half: [], full: [] };
+      
+      // Fetch both activated and non-activated summaries in parallel
+      const [activated, nonActivated] = await Promise.all([
+        actor.getActivatedClientSummaries(),
+        actor.getNonActivatedClientSummaries(),
+      ]);
+      
+      return {
+        activated,
+        half: nonActivated.halfOnboardedClients,
+        full: nonActivated.fullOnboardedClients,
+      };
+    },
+    enabled: !!actor && !isFetching && actorReady,
+  });
+}
+
+/**
+ * Derive all client summaries as a flat array.
+ */
+export function useGetAllClientSummaries() {
+  const { data, isLoading } = useGetClientSummaries();
+
+  const allSummaries = useMemo(() => {
+    if (!data) return [];
+    return [...data.activated, ...data.half, ...data.full];
+  }, [data]);
+
+  return {
+    data: allSummaries,
+    isLoading,
+  };
+}
+
+/**
+ * Legacy hook for full client data - now only used when full details are needed.
+ * Prefer useGetClientSummaries for list views.
+ */
+export function useGetAllClients() {
+  const { actor, isFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
+
+  return useQuery({
+    queryKey: ['clients', identityKey],
     queryFn: async () => {
       if (!actor) return [];
       
-      // Fetch all three categories
-      const [allClients, halfClients, fullClients] = await Promise.all([
-        actor.getAllClients(),
-        actor.filterClientsByOnboardingState('half' as OnboardingState),
-        actor.filterClientsByOnboardingState('full' as OnboardingState),
-      ]);
+      // Single backend call to get all clients with full details
+      const result = await actor.getAllClientsAndNonActivatedClients();
       
-      // Combine and deduplicate by client code
-      const clientMap = new Map();
-      
-      // Add all activated clients first
-      allClients.forEach(client => {
-        clientMap.set(client.code.toString(), client);
-      });
-      
-      // Add non-activated half onboarded clients
-      halfClients.forEach(client => {
-        if (!clientMap.has(client.code.toString())) {
-          clientMap.set(client.code.toString(), client);
-        }
-      });
-      
-      // Add non-activated full onboarded clients
-      fullClients.forEach(client => {
-        if (!clientMap.has(client.code.toString())) {
-          clientMap.set(client.code.toString(), client);
-        }
-      });
-      
-      return Array.from(clientMap.values());
+      // Combine all three arrays into one
+      return [
+        ...result.activatedClients,
+        ...result.halfOnboardedClients,
+        ...result.fullOnboardedClients,
+      ];
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && actorReady,
   });
 }
 
+/**
+ * Fetch full client details for a specific client by code.
+ */
 export function useGetClient(clientCode: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: ['client', clientCode?.toString()],
+    queryKey: ['client', clientCode?.toString(), identityKey],
     queryFn: async () => {
       if (!actor || !clientCode) return null;
       
-      const allClients = queryClient.getQueryData<any[]>(['clients']);
+      // First, check if we have the client in the cached full clients list
+      const allClients = queryClient.getQueryData<ExtendedClient[]>(['clients', identityKey]);
       if (allClients) {
         const cached = allClients.find((c) => c.code === clientCode);
         if (cached) return cached;
       }
 
-      const [allClientsData, halfClients, fullClients] = await Promise.all([
-        actor.getAllClients(),
-        actor.filterClientsByOnboardingState('half' as OnboardingState),
-        actor.filterClientsByOnboardingState('full' as OnboardingState),
-      ]);
-      
-      const clientMap = new Map();
-      allClientsData.forEach(client => clientMap.set(client.code.toString(), client));
-      halfClients.forEach(client => {
-        if (!clientMap.has(client.code.toString())) {
-          clientMap.set(client.code.toString(), client);
-        }
-      });
-      fullClients.forEach(client => {
-        if (!clientMap.has(client.code.toString())) {
-          clientMap.set(client.code.toString(), client);
-        }
-      });
-      
-      const combined = Array.from(clientMap.values());
-      return combined.find((c) => c.code === clientCode) || null;
+      // If not in cache, fetch single client by code
+      return actor.getClientByCode(clientCode);
     },
-    enabled: !!actor && !isFetching && clientCode !== null,
+    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
   });
 }
 
+/**
+ * Mutation to prepare full client data for export.
+ * Fetches full ExtendedClient records for a given set of client codes.
+ */
+export function usePrepareClientsForExport() {
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientCodes: bigint[]) => {
+      if (!actor) throw new Error('Actor not available');
+      
+      // Check cache first
+      const cachedClients = queryClient.getQueryData<ExtendedClient[]>(['clients', identityKey]);
+      if (cachedClients) {
+        const allCached = clientCodes.every(code => 
+          cachedClients.some(c => c.code === code)
+        );
+        if (allCached) {
+          return cachedClients.filter(c => clientCodes.some(code => code === c.code));
+        }
+      }
+
+      // Fetch full data if not cached
+      const result = await actor.getAllClientsAndNonActivatedClients();
+      const allClients = [
+        ...result.activatedClients,
+        ...result.halfOnboardedClients,
+        ...result.fullOnboardedClients,
+      ];
+      
+      // Update cache
+      queryClient.setQueryData(['clients', identityKey], allClients);
+      
+      // Return filtered clients
+      return allClients.filter(c => clientCodes.some(code => code === c.code));
+    },
+  });
+}
+
+/**
+ * Derive clients by follow-up day from cached summary data.
+ */
 export function useGetClientsByFollowUpDay(day: FollowUpDay | null) {
-  const { actor, isFetching } = useActor();
+  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
 
-  return useQuery({
-    queryKey: ['clients', 'followUpDay', day],
-    queryFn: async () => {
-      if (!actor || !day) return [];
-      const clients = await actor.getClientsByFollowUpDay(day);
-      return clients.filter(client => isClientActivated(client) && client.status === 'active');
-    },
-    enabled: !!actor && !isFetching && day !== null,
-  });
+  const filteredClients = useMemo(() => {
+    if (!allSummaries || !day) return [];
+    
+    // Filter client-side from cached summary data
+    return allSummaries.filter(client => 
+      isClientActivated(client) && 
+      client.status === 'active' && 
+      client.followUpDay === day
+    );
+  }, [allSummaries, day]);
+
+  return {
+    data: filteredClients,
+    isLoading,
+  };
 }
 
+/**
+ * Derive expiring clients from cached summary data.
+ */
 export function useGetExpiringClients() {
-  const { actor, isFetching } = useActor();
+  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
 
-  return useQuery({
-    queryKey: ['clients', 'expiring'],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getExpiringClients();
-    },
-    enabled: !!actor && !isFetching,
-  });
+  const expiringClients = useMemo(() => {
+    if (!allSummaries) return [];
+    
+    // Compute expiring status client-side
+    const threeDaysFromNow = BigInt(Date.now() * 1_000_000) + (3n * 86_400_000_000_000n);
+    const now = BigInt(Date.now() * 1_000_000);
+    
+    return allSummaries.filter(client => {
+      if (!client.endDate) return false;
+      const endDate = client.endDate;
+      return endDate > now && endDate <= threeDaysFromNow;
+    });
+  }, [allSummaries]);
+
+  return {
+    data: expiringClients,
+    isLoading,
+  };
 }
 
 export function useGetClientProgress(clientCode: bigint | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching, actorReady } = useActorReady();
+  const identityKey = useIdentityKey();
 
   return useQuery({
-    queryKey: ['progress', clientCode?.toString()],
+    queryKey: ['progress', clientCode?.toString(), identityKey],
     queryFn: async () => {
       if (!actor || !clientCode) return [];
       return actor.getClientProgress(clientCode);
     },
-    enabled: !!actor && !isFetching && clientCode !== null,
+    enabled: !!actor && !isFetching && actorReady && clientCode !== null,
   });
 }
 
 export function useCreateClient() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -184,13 +275,15 @@ export function useCreateClient() {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }
 
 export function useAddProgress() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -215,14 +308,15 @@ export function useAddProgress() {
       );
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['progress', variables.clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['progress', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
     },
   });
 }
 
 export function usePauseClient() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -239,14 +333,16 @@ export function usePauseClient() {
       );
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }
 
 export function useResumeClient() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -255,14 +351,16 @@ export function useResumeClient() {
       return actor.resumeClient(clientCode);
     },
     onSuccess: (_, clientCode) => {
-      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }
 
 export function useUpdateOnboardingState() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -271,14 +369,16 @@ export function useUpdateOnboardingState() {
       return actor.updateOnboardingState(params.clientCode, params.state);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }
 
 export function useActivateClient() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -291,14 +391,16 @@ export function useActivateClient() {
       return actor.activateClient(params.clientCode, params.startDate, params.followUpDay);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }
 
 export function useRecordFollowUp() {
-  const { actor } = useActor();
+  const { actor } = useActorReady();
+  const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -317,8 +419,8 @@ export function useRecordFollowUp() {
       );
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString()] });
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
     },
   });
 }

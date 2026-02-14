@@ -18,3 +18,9 @@ export function formatDateTime(timestamp: bigint): string {
     minute: '2-digit',
   });
 }
+
+export function formatDateForExcel(timestamp: bigint | undefined): string {
+  if (!timestamp) return '';
+  const date = new Date(Number(timestamp) / 1_000_000);
+  return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+}

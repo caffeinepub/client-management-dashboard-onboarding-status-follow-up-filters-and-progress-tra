@@ -21,6 +21,19 @@ export interface ClientProgress {
 }
 export type ClientStatus = { 'active' : null } |
   { 'paused' : null };
+export interface ClientSummary {
+  'status' : ClientStatus,
+  'endDate' : [] | [Time],
+  'activatedAt' : [] | [Time],
+  'code' : bigint,
+  'name' : string,
+  'pauseTime' : [] | [Time],
+  'mobileNumber' : string,
+  'planDurationDays' : bigint,
+  'followUpDay' : [] | [FollowUpDay],
+  'onboardingState' : OnboardingState,
+  'startDate' : [] | [Time],
+}
 export interface ExtendedClient {
   'status' : ClientStatus,
   'pauseEntries' : Array<PauseEntry>,
@@ -81,13 +94,31 @@ export interface _SERVICE {
     [OnboardingState],
     Array<ExtendedClient>
   >,
+  'getActivatedClientSummaries' : ActorMethod<[], Array<ClientSummary>>,
   'getAllClients' : ActorMethod<[], Array<ExtendedClient>>,
+  'getAllClientsAndNonActivatedClients' : ActorMethod<
+    [],
+    {
+      'fullOnboardedClients' : Array<ExtendedClient>,
+      'halfOnboardedClients' : Array<ExtendedClient>,
+      'activatedClients' : Array<ExtendedClient>,
+    }
+  >,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getClientByCode' : ActorMethod<[bigint], [] | [ExtendedClient]>,
   'getClientProgress' : ActorMethod<[bigint], Array<ClientProgress>>,
+  'getClientSummaries' : ActorMethod<[], Array<ClientSummary>>,
   'getClientsByFollowUpDay' : ActorMethod<[FollowUpDay], Array<ExtendedClient>>,
   'getExpiringClients' : ActorMethod<[], Array<ExtendedClient>>,
   'getFollowUpHistory' : ActorMethod<[bigint], Array<FollowUpEntry>>,
+  'getNonActivatedClientSummaries' : ActorMethod<
+    [],
+    {
+      'fullOnboardedClients' : Array<ClientSummary>,
+      'halfOnboardedClients' : Array<ClientSummary>,
+    }
+  >,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'pauseClient' : ActorMethod<[bigint, bigint, string], undefined>,

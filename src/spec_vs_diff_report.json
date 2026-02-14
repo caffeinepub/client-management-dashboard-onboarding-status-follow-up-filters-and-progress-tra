@@ -1,50 +1,59 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T19:50:11.892Z",
-  "summary": "Diff adds a manual \"Mark as Done\" button UI to the Follow-up Status card with a disabled/loading state, but the diff excerpts do not provide enough evidence that the button is only shown for activated clients with a configured follow-up day, that clicking it actually records a done follow-up via the existing flow and updates the UI/history, or that failures surface a normalized error toast.",
+  "generatedAt": "2026-02-14T20:58:56.169Z",
+  "summary": "Diff implements new frontend summary-based queries and updates Dashboard/Clients list to use them, plus status utilities to support both summary and full client types. However, the backend changes shown do not provide clear evidence of the required new ClientSummary type and summary query APIs, and the startup refetch-storm fix in useActor.ts is not evidenced. There are also unrelated feature changes (user profiles and onboarding UX) not requested.",
   "missing_requirements": [
     {
       "id": "REQ-1",
-      "requirement": "When viewing an activated client with a configured follow-up day, the Follow-up Status card shows a clear action button to manually mark the follow-up as done.",
-      "reason": "FollowUpSection renders the button whenever an onMarkDone prop is provided, but the provided diff snippet does not show the parent logic that only supplies onMarkDone for activated clients with a configured follow-up day.",
+      "requirement": "Backend defines a new public lightweight ClientSummary type excluding progress/pauseEntries/followUpHistory, and exposes a new query method returning all client summaries in one call with access rules consistent with existing APIs, while keeping existing endpoints unchanged.",
+      "reason": "Frontend now calls summary endpoints (getActivatedClientSummaries/getNonActivatedClientSummaries) and imports ClientSummary, but the provided backend diff snippet is truncated and does not show a public ClientSummary type or the required query method(s). The new endpoints are not visible in the backend evidence provided.",
       "evidence": [
-        "frontend/src/components/clients/FollowUpSection.tsx (button gated only by `onMarkDone`)",
-        "frontend/src/pages/ClientProfilePage.tsx (truncated; parent gating logic not visible)"
+        "backend/main.mo (truncated)",
+        "frontend/src/hooks/useQueries.ts (calls actor.getActivatedClientSummaries() / actor.getNonActivatedClientSummaries())"
       ]
     },
     {
-      "id": "REQ-1",
-      "requirement": "Clicking the button records a follow-up entry with status = done for that client using the existing follow-up recording flow, and the UI updates to show the status as Done.",
-      "reason": "ClientProfilePage imports useRecordFollowUp, toast, and normalizeError, but the actual onClick handler implementation (calling the mutation and updating UI state/cache) is not visible in the truncated excerpt.",
+      "id": "REQ-2",
+      "requirement": "React Query caches for summaries and full clients are kept consistent (mutations that change client fields invalidate/refetch the summary list cache as needed).",
+      "reason": "While new summary hooks and page usage are present, the diff excerpt does not show mutations (e.g., activate/pause/edit client) invalidating/refetching the ['clientSummaries', identityKey] cache. Only the user profile mutation shows invalidation for ['currentUserProfile', identityKey].",
       "evidence": [
-        "frontend/src/pages/ClientProfilePage.tsx (truncated; imports `useRecordFollowUp`, `toast`, `normalizeError` but handler not shown)"
+        "frontend/src/hooks/useQueries.ts (shows invalidateQueries only for currentUserProfile; summary cache invalidation not evidenced in truncated content)"
       ]
     },
     {
-      "id": "REQ-1",
-      "requirement": "After marking as done, the new entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.",
-      "reason": "FollowUpSection sorts history by timestamp descending (which would display a newly added entry at the top), but the diff excerpt does not show that a new entry is actually appended/returned from the existing record flow with correct timestamp and follow-up day.",
+      "id": "REQ-3",
+      "requirement": "Remove any unconditional broad refetch-all behavior tied to actor creation/identity changes (frontend/src/hooks/useActor.ts should not refetch all non-actor queries when actor becomes available).",
+      "reason": "No change to frontend/src/hooks/useActor.ts is shown in the diff summary (it is not listed among modified files), so there is no evidence the refetch-storm behavior was removed or narrowed.",
       "evidence": [
-        "frontend/src/components/clients/FollowUpSection.tsx (history is sorted by timestamp desc)",
-        "frontend/src/pages/ClientProfilePage.tsx (truncated; mutation success/update not shown)"
-      ]
-    },
-    {
-      "id": "REQ-1",
-      "requirement": "If recording fails, show a user-facing error toast using the app’s existing error normalization/toast patterns.",
-      "reason": "Although toast and normalizeError are imported in ClientProfilePage, the diff excerpt is truncated before any error handling for the manual mark-done action is shown.",
-      "evidence": [
-        "frontend/src/pages/ClientProfilePage.tsx (truncated; imports `normalizeError` and `toast` but error handling not shown)"
+        "File diff summary: no entry for frontend/src/hooks/useActor.ts"
       ]
     }
   ],
-  "hallucinated_features": [],
-  "confidence": 0.56,
+  "hallucinated_features": [
+    {
+      "description": "Added backend user profile APIs (UserProfile type plus getCallerUserProfile/getUserProfile/saveCallerUserProfile) unrelated to client-summary fetching performance requirements.",
+      "reason": "BuildRequest does not ask for user profiles or profile persistence endpoints; these appear as new/changed backend functionality beyond the specified scope.",
+      "evidence": [
+        "backend/main.mo (truncated: UserProfile type and related methods)"
+      ]
+    },
+    {
+      "description": "Changed onboarding UX: removed follow-up day selection on OnboardClientPage and added a note about activation being required to set follow-up day.",
+      "reason": "BuildRequest explicitly focuses on load-time/data-fetch performance and states non-goals include unrelated product features/UI redesign; this is a behavioral/UX change not requested.",
+      "evidence": [
+        "frontend-file-summaries.txt (OnboardClientPage: follow-up day selection removed and note added)"
+      ]
+    }
+  ],
+  "confidence": 0.68,
   "changed_files": [
+    "backend/main.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/clients/FollowUpSection.tsx",
-    "frontend/src/pages/ClientProfilePage.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/ClientsListPage.tsx",
+    "frontend/src/pages/DashboardPage.tsx",
+    "frontend/src/utils/status.ts",
     "project_state.json"
   ]
 }

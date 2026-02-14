@@ -1,31 +1,41 @@
-import { useState, useMemo } from 'react';
-import { useGetAllClients, useGetExpiringClients } from '../hooks/useQueries';
+import { useState, useMemo, Suspense, lazy } from 'react';
+import { useGetAllClientSummaries, useGetExpiringClients, usePrepareClientsForExport } from '../hooks/useQueries';
 import { useRouter } from '../hooks/useRouter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { Phone, Calendar, Search, Users } from 'lucide-react';
+import { Phone, Calendar, Search, Users, Download, Loader2 } from 'lucide-react';
 import { ClientStatusBadge } from '../components/clients/ClientStatusBadge';
+import { ClientsStatusFilterButton } from '../components/clients/ClientsStatusFilterButton';
 import { getClientStatus, getDisplayStatus, isClientActivated, type ClientStatus } from '../utils/status';
 import { formatDate } from '../utils/format';
 import { formatClientCode, matchesClientCodeQuery } from '../utils/clientCode';
-import type { OnboardingState } from '../backend';
+import type { OnboardingState, ExtendedClient } from '../backend';
 import { OnboardingState as OnboardingStateEnum } from '../backend';
+import { toast } from 'sonner';
+
+// Lazy load export dialog
+const ExportClientsExcelDialog = lazy(() => 
+  import('../components/clients/ExportClientsExcelDialog').then(m => ({ default: m.ExportClientsExcelDialog }))
+);
 
 type FilterType = 'all' | 'active' | 'paused' | 'expired' | 'expiring' | 'half' | 'full';
 
 export function ClientsListPage() {
-  const { data: allClients, isLoading } = useGetAllClients();
+  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
   const { data: expiringClients } = useGetExpiringClients();
   const { navigate } = useRouter();
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportClients, setExportClients] = useState<ExtendedClient[] | null>(null);
+  
+  const prepareExport = usePrepareClientsForExport();
 
-  const filteredClients = useMemo(() => {
-    if (!allClients) return [];
+  const filteredSummaries = useMemo(() => {
+    if (!allSummaries) return [];
 
-    let filtered = allClients;
+    let filtered = allSummaries;
 
     // Apply status/onboarding filter
     if (filter !== 'all') {
@@ -66,31 +76,49 @@ export function ClientsListPage() {
     }
 
     return filtered;
-  }, [allClients, expiringClients, filter, searchQuery]);
+  }, [allSummaries, expiringClients, filter, searchQuery]);
 
   const getFilterCount = (filterType: FilterType): number => {
-    if (!allClients) return 0;
-    if (filterType === 'all') return allClients.length;
+    if (!allSummaries) return 0;
+    if (filterType === 'all') return allSummaries.length;
     if (filterType === 'expiring') return expiringClients?.length || 0;
     
     if (filterType === 'active') {
-      return allClients.filter((c) => {
+      return allSummaries.filter((c) => {
         const status = getClientStatus(c);
         return isClientActivated(c) && status !== 'paused' && status !== 'expired';
       }).length;
     }
     
     if (filterType === 'paused') {
-      return allClients.filter((c) => getClientStatus(c) === 'paused').length;
+      return allSummaries.filter((c) => getClientStatus(c) === 'paused').length;
     }
     
     if (filterType === 'half' || filterType === 'full') {
       const onboardingState: OnboardingState = filterType === 'half' ? OnboardingStateEnum.half : OnboardingStateEnum.full;
-      return allClients.filter((c) => {
+      return allSummaries.filter((c) => {
         return c.onboardingState === onboardingState && !isClientActivated(c);
       }).length;
     }
-    return allClients.filter((c) => getClientStatus(c) === filterType).length;
+    return allSummaries.filter((c) => getClientStatus(c) === filterType).length;
+  };
+
+  const handleExportClick = async () => {
+    if (!filteredSummaries || filteredSummaries.length === 0) {
+      toast.error('No clients to export');
+      return;
+    }
+
+    try {
+      // Prepare full client data for export
+      const clientCodes = filteredSummaries.map(s => s.code);
+      const fullClients = await prepareExport.mutateAsync(clientCodes);
+      setExportClients(fullClients);
+      setShowExportDialog(true);
+    } catch (error) {
+      console.error('Export preparation error:', error);
+      toast.error('Failed to prepare export data');
+    }
   };
 
   return (
@@ -110,57 +138,64 @@ export function ClientsListPage() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => navigate('onboard')}>
-          <Users className="mr-2 h-4 w-4" />
-          Onboard Client
-        </Button>
+        <div className="flex gap-2">
+          <ClientsStatusFilterButton
+            currentFilter={filter}
+            onFilterChange={setFilter}
+            getFilterCount={getFilterCount}
+          />
+          <Button
+            variant="outline"
+            onClick={handleExportClick}
+            disabled={isLoading || !allSummaries || allSummaries.length === 0 || prepareExport.isPending}
+          >
+            {prepareExport.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Preparing...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Export to Excel
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="all">
-            All
-            <span className="ml-1.5 text-xs">({getFilterCount('all')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="active">
-            Active
-            <span className="ml-1.5 text-xs">({getFilterCount('active')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="half">
-            Half
-            <span className="ml-1.5 text-xs">({getFilterCount('half')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="full">
-            Full
-            <span className="ml-1.5 text-xs">({getFilterCount('full')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="paused">
-            Paused
-            <span className="ml-1.5 text-xs">({getFilterCount('paused')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="expiring">
-            Expiring
-            <span className="ml-1.5 text-xs">({getFilterCount('expiring')})</span>
-          </TabsTrigger>
-          <TabsTrigger value="expired">
-            Expired
-            <span className="ml-1.5 text-xs">({getFilterCount('expired')})</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center space-y-3">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center space-y-4">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-            <p className="text-sm text-muted-foreground">Loading clients...</p>
+            <p className="text-muted-foreground">Loading clients...</p>
           </div>
         </div>
-      ) : filteredClients.length > 0 ? (
+      ) : filteredSummaries.length === 0 ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-3">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto" />
+              <div>
+                <h3 className="font-semibold text-lg">No clients found</h3>
+                <p className="text-muted-foreground text-sm">
+                  {searchQuery || filter !== 'all'
+                    ? 'Try adjusting your search or filter'
+                    : 'Get started by onboarding your first client'}
+                </p>
+              </div>
+              {!searchQuery && filter === 'all' && (
+                <Button onClick={() => navigate('onboard')} className="mt-4">
+                  Onboard Client
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClients.map((client) => {
+          {filteredSummaries.map((client) => {
             const displayStatus = getDisplayStatus(client);
-            const activated = isClientActivated(client);
             return (
               <Card
                 key={client.code.toString()}
@@ -172,23 +207,24 @@ export function ClientsListPage() {
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <h3 className="font-semibold text-lg">{client.name}</h3>
-                        <p className="text-sm text-muted-foreground">Code: {formatClientCode(client.code)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatClientCode(client.code.toString())}
+                        </p>
                       </div>
                       <ClientStatusBadge status={displayStatus} />
                     </div>
+
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-4 w-4" />
                         <span>{client.mobileNumber}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        {activated && client.endDate ? (
+                      {client.endDate && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
                           <span>Ends: {formatDate(client.endDate)}</span>
-                        ) : (
-                          <span className="text-muted-foreground">Not activated yet</span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -196,27 +232,21 @@ export function ClientsListPage() {
             );
           })}
         </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-3">
-              <Users className="h-12 w-12 text-muted-foreground mx-auto" />
-              <div>
-                <h3 className="font-semibold text-lg">No clients found</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {searchQuery
-                    ? 'Try adjusting your search or filters'
-                    : 'Get started by onboarding your first client'}
-                </p>
-              </div>
-              {!searchQuery && (
-                <Button onClick={() => navigate('onboard')} className="mt-4">
-                  Onboard Client
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      )}
+
+      {showExportDialog && exportClients && (
+        <Suspense fallback={null}>
+          <ExportClientsExcelDialog
+            clients={exportClients}
+            open={showExportDialog}
+            onOpenChange={(open) => {
+              setShowExportDialog(open);
+              if (!open) {
+                setExportClients(null);
+              }
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

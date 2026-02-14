@@ -12,9 +12,6 @@ import Iter "mo:core/Iter";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
-
-// Must use with-clause, never call migration.run directly
-
 actor {
   // Authorization system using prefabricated component modules
   let accessControlState = AccessControl.initState();
@@ -179,6 +176,21 @@ actor {
     pauseEntries : [PauseEntry];
     followUpDay : ?FollowUpDay;
     followUpHistory : [FollowUpEntry];
+  };
+
+  // Client Summary Type for Light API
+  public type ClientSummary = {
+    code : Nat;
+    name : Text;
+    mobileNumber : Text;
+    planDurationDays : Nat;
+    status : ClientStatus;
+    onboardingState : OnboardingState;
+    pauseTime : ?Time.Time;
+    startDate : ?Time.Time;
+    endDate : ?Time.Time;
+    activatedAt : ?Time.Time;
+    followUpDay : ?FollowUpDay;
   };
 
   let clients = Map.empty<Nat, Client>();
@@ -470,6 +482,86 @@ actor {
     updateClientOnboardingState(clientCode, #half);
   };
 
+  // New query to fetch single client by code
+  public query ({ caller }) func getClientByCode(clientCode : Nat) : async ?ExtendedClient {
+    requireUserRole(caller);
+    switch (clients.get(clientCode)) {
+      case (null) { null };
+      case (?client) { ?convertToExtendedClient(client) };
+    };
+  };
+
+  public query ({ caller }) func getAllClientsAndNonActivatedClients() : async {
+    activatedClients : [ExtendedClient];
+    halfOnboardedClients : [ExtendedClient];
+    fullOnboardedClients : [ExtendedClient];
+  } {
+    requireUserRole(caller);
+
+    let allClients = clients.values().toArray();
+
+    let activated = allClients.filter(
+      func(client) { client.activatedAt != null }
+    );
+
+    let halfOnboarded = allClients.filter(
+      func(client) { client.onboardingState == #half and client.activatedAt == null }
+    );
+
+    let fullOnboarded = allClients.filter(
+      func(client) { client.onboardingState == #full and client.activatedAt == null }
+    );
+
+    {
+      activatedClients = convertToExtendedClients(activated);
+      halfOnboardedClients = convertToExtendedClients(halfOnboarded);
+      fullOnboardedClients = convertToExtendedClients(fullOnboarded);
+    };
+  };
+
+  // New queries to fetch lightweight client summaries
+  public query ({ caller }) func getClientSummaries() : async [ClientSummary] {
+    requireUserRole(caller);
+
+    let filteredClients = clients.values().toArray().filter(
+      func(client) {
+        client.activatedAt != null;
+      }
+    );
+    convertToClientSummaries(filteredClients);
+  };
+
+  public query ({ caller }) func getActivatedClientSummaries() : async [ClientSummary] {
+    requireUserRole(caller);
+
+    let filteredClients = clients.values().toArray().filter(
+      func(client) { client.activatedAt != null }
+    );
+    convertToClientSummaries(filteredClients);
+  };
+
+  public query ({ caller }) func getNonActivatedClientSummaries() : async {
+    halfOnboardedClients : [ClientSummary];
+    fullOnboardedClients : [ClientSummary];
+  } {
+    requireUserRole(caller);
+
+    let allClients = clients.values().toArray();
+
+    let halfOnboarded = allClients.filter(
+      func(client) { client.onboardingState == #half and client.activatedAt == null }
+    );
+
+    let fullOnboarded = allClients.filter(
+      func(client) { client.onboardingState == #full and client.activatedAt == null }
+    );
+
+    {
+      halfOnboardedClients = convertToClientSummaries(halfOnboarded);
+      fullOnboardedClients = convertToClientSummaries(fullOnboarded);
+    };
+  };
+
   func trapNotFound(item : Text) : () {
     Runtime.trap(item # " not found");
   };
@@ -496,28 +588,51 @@ actor {
     };
   };
 
+  func convertToExtendedClient(client : Client) : ExtendedClient {
+    {
+      code = client.code;
+      name = client.name;
+      mobileNumber = client.mobileNumber;
+      planDurationDays = client.planDurationDays;
+      notes = client.notes;
+      status = client.status;
+      onboardingState = client.onboardingState;
+      progress = client.progress;
+      pauseTime = client.pauseTime;
+      totalPausedDuration = client.totalPausedDuration;
+      startDate = client.startDate;
+      endDate = client.endDate;
+      activatedAt = client.activatedAt;
+      pauseEntries = client.pauseEntries;
+      followUpDay = client.followUpDay;
+      followUpHistory = client.followUpHistory;
+    };
+  };
+
   func convertToExtendedClients(clients : [Client]) : [ExtendedClient] {
     clients.map(
-      func(client) {
-        {
-          code = client.code;
-          name = client.name;
-          mobileNumber = client.mobileNumber;
-          planDurationDays = client.planDurationDays;
-          notes = client.notes;
-          status = client.status;
-          onboardingState = client.onboardingState;
-          progress = client.progress;
-          pauseTime = client.pauseTime;
-          totalPausedDuration = client.totalPausedDuration;
-          startDate = client.startDate;
-          endDate = client.endDate;
-          activatedAt = client.activatedAt;
-          pauseEntries = client.pauseEntries;
-          followUpDay = client.followUpDay;
-          followUpHistory = client.followUpHistory; // New field
-        };
-      }
+      func(client) { convertToExtendedClient(client) }
     );
+  };
+
+  // New helper function to convert to ClientSummary array
+  func convertToClientSummaries(clients : [Client]) : [ClientSummary] {
+    clients.map(func(client) { convertToClientSummary(client) });
+  };
+
+  func convertToClientSummary(client : Client) : ClientSummary {
+    {
+      code = client.code;
+      name = client.name;
+      mobileNumber = client.mobileNumber;
+      planDurationDays = client.planDurationDays;
+      status = client.status;
+      onboardingState = client.onboardingState;
+      pauseTime = client.pauseTime;
+      startDate = client.startDate;
+      endDate = client.endDate;
+      activatedAt = client.activatedAt;
+      followUpDay = client.followUpDay;
+    };
   };
 };

@@ -70,6 +70,19 @@ export const ExtendedClient = IDL.Record({
   'onboardingState' : OnboardingState,
   'startDate' : IDL.Opt(Time),
 });
+export const ClientSummary = IDL.Record({
+  'status' : ClientStatus,
+  'endDate' : IDL.Opt(Time),
+  'activatedAt' : IDL.Opt(Time),
+  'code' : IDL.Nat,
+  'name' : IDL.Text,
+  'pauseTime' : IDL.Opt(Time),
+  'mobileNumber' : IDL.Text,
+  'planDurationDays' : IDL.Nat,
+  'followUpDay' : IDL.Opt(FollowUpDay),
+  'onboardingState' : OnboardingState,
+  'startDate' : IDL.Opt(Time),
+});
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 
 export const idlService = IDL.Service({
@@ -99,14 +112,32 @@ export const idlService = IDL.Service({
       [IDL.Vec(ExtendedClient)],
       ['query'],
     ),
+  'getActivatedClientSummaries' : IDL.Func(
+      [],
+      [IDL.Vec(ClientSummary)],
+      ['query'],
+    ),
   'getAllClients' : IDL.Func([], [IDL.Vec(ExtendedClient)], ['query']),
+  'getAllClientsAndNonActivatedClients' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'fullOnboardedClients' : IDL.Vec(ExtendedClient),
+          'halfOnboardedClients' : IDL.Vec(ExtendedClient),
+          'activatedClients' : IDL.Vec(ExtendedClient),
+        }),
+      ],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getClientByCode' : IDL.Func([IDL.Nat], [IDL.Opt(ExtendedClient)], ['query']),
   'getClientProgress' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(ClientProgress)],
       ['query'],
     ),
+  'getClientSummaries' : IDL.Func([], [IDL.Vec(ClientSummary)], ['query']),
   'getClientsByFollowUpDay' : IDL.Func(
       [FollowUpDay],
       [IDL.Vec(ExtendedClient)],
@@ -116,6 +147,16 @@ export const idlService = IDL.Service({
   'getFollowUpHistory' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(FollowUpEntry)],
+      ['query'],
+    ),
+  'getNonActivatedClientSummaries' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'fullOnboardedClients' : IDL.Vec(ClientSummary),
+          'halfOnboardedClients' : IDL.Vec(ClientSummary),
+        }),
+      ],
       ['query'],
     ),
   'getUserProfile' : IDL.Func(
@@ -199,6 +240,19 @@ export const idlFactory = ({ IDL }) => {
     'onboardingState' : OnboardingState,
     'startDate' : IDL.Opt(Time),
   });
+  const ClientSummary = IDL.Record({
+    'status' : ClientStatus,
+    'endDate' : IDL.Opt(Time),
+    'activatedAt' : IDL.Opt(Time),
+    'code' : IDL.Nat,
+    'name' : IDL.Text,
+    'pauseTime' : IDL.Opt(Time),
+    'mobileNumber' : IDL.Text,
+    'planDurationDays' : IDL.Nat,
+    'followUpDay' : IDL.Opt(FollowUpDay),
+    'onboardingState' : OnboardingState,
+    'startDate' : IDL.Opt(Time),
+  });
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   
   return IDL.Service({
@@ -228,14 +282,36 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(ExtendedClient)],
         ['query'],
       ),
+    'getActivatedClientSummaries' : IDL.Func(
+        [],
+        [IDL.Vec(ClientSummary)],
+        ['query'],
+      ),
     'getAllClients' : IDL.Func([], [IDL.Vec(ExtendedClient)], ['query']),
+    'getAllClientsAndNonActivatedClients' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'fullOnboardedClients' : IDL.Vec(ExtendedClient),
+            'halfOnboardedClients' : IDL.Vec(ExtendedClient),
+            'activatedClients' : IDL.Vec(ExtendedClient),
+          }),
+        ],
+        ['query'],
+      ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getClientByCode' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Opt(ExtendedClient)],
+        ['query'],
+      ),
     'getClientProgress' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(ClientProgress)],
         ['query'],
       ),
+    'getClientSummaries' : IDL.Func([], [IDL.Vec(ClientSummary)], ['query']),
     'getClientsByFollowUpDay' : IDL.Func(
         [FollowUpDay],
         [IDL.Vec(ExtendedClient)],
@@ -245,6 +321,16 @@ export const idlFactory = ({ IDL }) => {
     'getFollowUpHistory' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(FollowUpEntry)],
+        ['query'],
+      ),
+    'getNonActivatedClientSummaries' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'fullOnboardedClients' : IDL.Vec(ClientSummary),
+            'halfOnboardedClients' : IDL.Vec(ClientSummary),
+          }),
+        ],
         ['query'],
       ),
     'getUserProfile' : IDL.Func(

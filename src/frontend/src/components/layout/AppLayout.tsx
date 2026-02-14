@@ -26,6 +26,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const handleLogout = async () => {
     await clear();
+    // Clear all cached application data on logout
     queryClient.clear();
   };
 

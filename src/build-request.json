@@ -1,36 +1,91 @@
 {
   "kind": "build_request",
-  "title": "Add manual 'Mark follow-up done' button in Follow-up Status",
+  "title": "Streamline client data fetching to further reduce initial wait",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Add a manual action button in the Client Profile page’s Follow-up Status UI that lets the user mark the follow-up as done on demand (without waiting for the automatic due-date popup).",
+      "text": "Add a lightweight client-summary API so the frontend can fetch only the minimal client fields needed for initial screens (Dashboard and Clients list) instead of fetching full ExtendedClient records (including progress and history) during app startup.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "streamline how client data is fetched to reduce the initial wait even more."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend defines a new public type for a lightweight client summary (e.g., code, name, mobileNumber, status, onboardingState, followUpDay, startDate/endDate, activatedAt) that excludes progress arrays, pauseEntries arrays, and followUpHistory arrays.",
+        "Backend exposes a new query method that returns all client summaries in one call for the current user (admin/user access rules consistent with existing client APIs).",
+        "Existing endpoints (e.g., getAllClientsAndNonActivatedClients, getClientByCode, getClientProgress) continue to work unchanged."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Update the React Query data layer to use the new client-summary API as the default dataset for initial rendering, and only fetch full client details on-demand when a user navigates to an individual client profile.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-3"
         ],
         "quotes": [
-          "Add on button in followup status that can manually mark followup done"
+          "streamline how client data is fetched to reduce the initial wait even more."
         ]
       },
       "acceptanceCriteria": [
-        "When viewing an activated client with a configured follow-up day, the Follow-up Status card shows a clear action button to manually mark the follow-up as done.",
-        "Clicking the button records a follow-up entry with status = done for that client (using the existing follow-up recording flow), and the UI updates to show the status as Done.",
-        "After marking as done, the new entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.",
-        "The button is disabled and shows a loading state while the follow-up record mutation is in progress.",
-        "If recording fails, show a user-facing error toast using the app’s existing error normalization/toast patterns."
+        "A new React Query hook is added (in frontend/src/hooks/useQueries.ts) to fetch and cache the client summaries list keyed by identity (similar scoping to the existing ['clients', identityKey] cache).",
+        "Dashboard and Clients list pages are updated to use the client summaries hook for their main list/metrics rendering, avoiding fetching full ExtendedClient records on initial route entry.",
+        "ClientProfilePage continues to fetch full client data by code when routed to a specific client (and still fetches progress via the existing progress query).",
+        "React Query caches for summaries and full clients are kept consistent (e.g., mutations that change client fields invalidate/refetch the summary list cache as needed)."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Prevent unnecessary refetch work at startup by removing any broad 'refetch all queries' behavior tied to actor creation/identity changes, so client data is only fetched when the relevant pages/hooks are mounted.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "streamline how client data is fetched to reduce the initial wait even more."
+        ]
+      },
+      "acceptanceCriteria": [
+        "frontend/src/hooks/useActor.ts no longer triggers an unconditional refetch of all non-actor queries when the actor becomes available (i.e., eliminate or narrowly scope refetchQueries that causes an app-wide refetch storm).",
+        "Queries related to client data do not automatically refetch multiple times during login/actor initialization; they should fetch once when enabled/mounted (unless explicitly invalidated by a mutation).",
+        "No changes are made to immutable frontend paths listed in SYSTEM_CONTEXT."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Ensure the client export flow remains functional with the streamlined fetching approach, including exporting based on the currently filtered client list.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-3"
+        ],
+        "quotes": [
+          "streamline how client data is fetched to reduce the initial wait even more."
+        ]
+      },
+      "acceptanceCriteria": [
+        "ClientsListPage still allows exporting the currently filtered set of clients.",
+        "If export requires fields not present in the summary dataset, the UI triggers an explicit fetch of full client data for export (without blocking initial page render), and shows a clear English loading state while preparing the export.",
+        "Export output remains the same as before for the same selection of export fields."
       ]
     }
   ],
   "constraints": [
-    "Do not edit any files under frontend/src/components/ui or other frontend immutablePaths listed in SYSTEM_CONTEXT.",
-    "Keep all backend logic within the single Motoko actor (backend/main.mo); do not introduce additional backend services."
+    "Backend must remain a single Motoko actor (all logic in backend/main.mo).",
+    "Do not edit frontend immutable paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useInternetIdentity.tsx, frontend/src/hooks/useActor.ts (allowed to change), frontend/src/main.tsx, frontend/src/components/ui (read-only UI components must be composed, not edited).",
+    "Use English for any user-facing text."
   ],
   "nonGoals": [
-    "Do not change the backend FollowUpEntry schema or create new backend APIs if the existing recordFollowUp endpoint supports the manual action.",
-    "Do not change the automatic follow-up due popup behavior beyond ensuring it can coexist with the new manual button."
+    "Add real-time updates or streaming APIs.",
+    "Introduce external databases or third-party caching layers.",
+    "Redesign UI layout or add new product features unrelated to load-time/data-fetch performance."
   ],
   "imageRequirements": {
     "required": [],

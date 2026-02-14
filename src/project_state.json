@@ -1,16 +1,24 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
+  "summary": "Performance optimization project focused on reducing initial load time by streamlining client data fetching.",
   "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-add-a-manual-action-button-in-the-client-profile-page-s-follow-up-status-ui-that-lets-the-user-mark-the-follow-up-as-done-on-demand-without-waiting-for-the-automatic-due-date-popup",
-      "title": "Add a manual action button in the Client Profile page’s Follow-up Status UI that lets the user mark the follow-up as done on demand (without waiting for the automatic due-date popup).",
+      "id": "feature-update-the-react-query-data-layer-to-use-the-new-client-summary-api-as-the-default-dataset-for-initial-rendering-and-only-fetch-full-client-details-on-demand-when-a-user-navigates-to-an-individual-client-profile",
+      "title": "Update the React Query data layer to use the new client-summary API as the default dataset for initial rendering, and only fetch full client details on-demand when a user navigates to an individual client profile.",
       "reqIds": [
-        "REQ-1"
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-the-client-export-flow-remains-functional-with-the-streamlined-fetching-approach-including-exporting-based-on-the-currently-filtered-client-list",
+      "title": "Ensure the client export flow remains functional with the streamlined fetching approach, including exporting based on the currently filtered client list.",
+      "reqIds": [
+        "REQ-4"
       ],
       "version": 1
     }
@@ -18,12 +26,28 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Add a button in the follow-up status UI to manually mark a follow-up as done",
+      "summary": "Streamline how client data is fetched to reduce the initial wait (improve initial load performance).",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Add a lightweight client-summary API so the frontend can fetch only the minimal client fields needed for initial screens (Dashboard and Clients list) instead of fetching full ExtendedClient records (including progress and history) during app startup.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Prevent unnecessary refetch work at startup by removing any broad 'refetch all queries' behavior tied to actor creation/identity changes, so client data is only fetched when the relevant pages/hooks are mounted.",
+      "reqIds": [
+        "REQ-3"
+      ],
       "status": "pending"
     }
   ],
-  "projectName": "Add manual 'Mark follow-up done' button in Follow-up Status",
+  "projectName": "Streamline client data fetching to further reduce initial wait",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
