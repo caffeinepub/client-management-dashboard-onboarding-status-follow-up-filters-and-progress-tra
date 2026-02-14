@@ -1,72 +1,32 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T21:52:16.391Z",
-  "summary": "Diff implements a new initial-load timing utility + optional debug panel, adds a combined frontend init query (useGetAppInitData) with caching, and updates App.tsx to render the app shell with in-content loading/error+Retry states. However, key requested timings (actor creation + access-control init) are not evidenced, actor-change refetch storm fix is not shown in useActor.ts, and the backend combined init method is not evidenced in backend/main.mo.",
-  "missing_requirements": [
-    {
-      "id": "REQ-1",
-      "requirement": "Instrument initial-load timings for actor creation start/end and `_initializeAccessControlWithSecret` start/end, and include them in a single clearly labeled console timing report.",
-      "reason": "The diff shows timing events for `app-init-data-fetch` and `profile-fetch`, but no evidence of timing instrumentation around actor creation or `_initializeAccessControlWithSecret` (nor explicit start/end labels for those steps).",
-      "evidence": [
-        "frontend/src/utils/initialLoadTimings.ts",
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    },
-    {
-      "id": "REQ-1",
-      "requirement": "Record timestamps and durations for the first `clientSummaries` fetch start/end as part of initial-load timings.",
-      "reason": "The diff shows seeding client summaries from `getAppInitData()` and timing for `app-init-data-fetch`, but no evidence of a dedicated first `clientSummaries` fetch timing start/end event (and the `useGetClientSummaries` implementation is truncated, so it cannot be confirmed).",
-      "evidence": [
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "requirement": "Adjust actor-change invalidation behavior in `frontend/src/hooks/useActor.ts` so dependent queries are not force-refetched multiple times; invalidate once and allow normal refetching; identity changes still clear stale data and refetch correctly.",
-      "reason": "The diff does not show any modification to `frontend/src/hooks/useActor.ts` (the file is not listed as modified). A new `useActorReady` wrapper exists, but it is not the requested change location and does not itself demonstrate fixing actor-change invalidation storms.",
-      "evidence": [
-        "frontend/src/hooks/useActorReady.ts",
-        "frontend-file-summaries.txt"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "requirement": "Backend exposes a new query method that returns both caller profile and dashboard client summaries in one response payload (e.g., `getAppInitData`).",
-      "reason": "Frontend calls `actor.getAppInitData()`, but the backend diff shown for `backend/main.mo` is truncated and does not provide evidence that such a method was added/exposed.",
-      "evidence": [
-        "frontend/src/hooks/useQueries.ts",
-        "backend/main.mo"
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "requirement": "Set appropriate React Query `staleTime`/`gcTime` for the client summaries query to avoid refetching repeatedly during the first minute unless identity changes or explicit invalidation occurs.",
-      "reason": "`staleTime`/`gcTime` are shown for `useGetAppInitData` and `useGetCallerUserProfile`, but `useGetClientSummaries` is truncated, so there is no clear evidence that the client summaries query itself is configured as required.",
-      "evidence": [
-        "frontend/src/hooks/useQueries.ts"
-      ]
-    }
-  ],
+  "generatedAt": "2026-02-14T22:16:03.569Z",
+  "summary": "The diff largely implements the requested onboarding stabilization: onboarding submission is gated on a stable readiness signal, Enter-key submission is prevented while disabled, and error normalization replaces the literal \"Actor not available\" with a friendly message. However, the diff also introduces additional, broader App initialization/error UI changes and extra error-normalization mappings that were not explicitly requested.",
+  "missing_requirements": [],
   "hallucinated_features": [
     {
-      "description": "Error UI displays the underlying error message (potentially technical) in addition to a non-technical message.",
-      "reason": "REQ-3/AC asks for a non-technical error message; exposing `error.message` is an additional behavior not requested and may violate the intent of ‘non-technical’.",
+      "description": "Broader App-level init loading/error UI with retry and normalized error display (not specific to onboarding/actor readiness)",
+      "reason": "BuildRequest focuses on stabilizing the Onboard Client flow and onboarding error messaging; the diff adds new global init loading/error screens and retry behavior in App.tsx beyond those requirements.",
       "evidence": [
         "frontend/src/App.tsx"
       ]
+    },
+    {
+      "description": "Additional error-normalization mappings for various backend trap/messages unrelated to \"Actor not available\"",
+      "reason": "REQ-3 only asks to replace user-facing occurrences of the literal \"Actor not available\" with a friendly message; the diff also normalizes multiple other specific backend messages.",
+      "evidence": [
+        "frontend/src/utils/errors.ts"
+      ]
     }
   ],
-  "confidence": 0.68,
+  "confidence": 0.74,
   "changed_files": [
-    "backend/main.mo",
     "frontend-file-summaries.txt",
     "frontend/src/App.tsx",
-    "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
-    "frontend/src/hooks/useActorReady.ts",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/pages/DashboardPage.tsx",
-    "frontend/src/utils/initialLoadTimings.ts",
+    "frontend/src/hooks/useStableActorConnection.ts",
+    "frontend/src/pages/OnboardClientPage.tsx",
+    "frontend/src/utils/errors.ts",
     "project_state.json"
   ]
 }

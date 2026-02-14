@@ -1,136 +1,72 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Startup load-time instrumentation and refetch-storm reduction",
+  "title": "Stabilize onboarding flow during backend initialization to avoid raw actor errors",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Add startup timing instrumentation and an optional hidden in-app debug panel to identify where initial-load delays occur.",
+      "summary": "Gate Onboard Client submission until the backend connection is ready and prevent any submission attempts (including Enter key) during initialization windows.",
       "acceptanceCriteria": [
-        "On a fresh load, the browser console shows a single, clearly labeled timing report for initial load steps (actor, access-control init, profile query, summaries query).",
-        "Timing instrumentation does not appear in normal UI by default (only console, or a hidden toggle such as a URL param).",
-        "Instrumentation does not modify any files under frontend/src/components/ui or other immutablePaths."
+        "On Onboard Client page, the \"Create Client\" action is disabled (and cannot submit via Enter) until the backend actor is ready.",
+        "While waiting for actor readiness, the page shows a clear loading/disabled state (English text) indicating the app is connecting/initializing.",
+        "Attempting to onboard during an actor-not-ready window does not show a toast or inline message containing the literal text \"Actor not available\".",
+        "Once the actor becomes ready, the form becomes usable automatically without requiring a manual refresh."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/initialLoadTimings.ts",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
+          "operation": "modify",
+          "description": "Use actor readiness to hard-disable all onboarding mutations until ready: derive a single boolean for \"canInteract\" (based on stable readiness), disable the submit button and form fields accordingly, and add a guard at the top of handleSubmit to no-op when not ready (preventing mutation calls). Add keyboard handling so pressing Enter cannot submit while disabled (e.g., preventDefault in onKeyDown when not interactable). Ensure the loading/disabled copy is English and does not include internal terms like \"actor\"."
+        },
+        {
+          "path": "frontend/src/hooks/useStableActorConnection.ts",
           "operation": "create",
-          "description": "Create a lightweight timing/logger utility to record labeled start/end timestamps, compute durations, and emit a single consolidated console report for the initial-load sequence; include support for enabling via a URL param (e.g., debug flag) and exposing a read-only buffer for an optional hidden panel."
-        },
-        {
-          "path": "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
-          "operation": "create",
-          "description": "Add an optional hidden UI panel component that renders the captured timing events/durations when enabled via URL param; keep it out of the normal UI by default. Verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/hooks/useActor.ts",
-          "operation": "modify",
-          "description": "Instrument actor creation start/end and access-control initialization (_initializeAccessControlWithSecret) start/end using the new timing utility; ensure the timing report is emitted once per fresh load and remains console-only unless the debug URL flag is present."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Instrument getCallerUserProfile start/end and the first client summaries fetch start/end (covering both activated and non-activated summaries, and later the combined init call if used) using the timing utility; ensure instrumentation does not change fetch semantics aside from logging."
-        },
-        {
-          "path": "frontend/src/App.tsx",
-          "operation": "modify",
-          "description": "Wire the optional InitialLoadDebugPanel into the authenticated app shell in a non-invasive way (only renders when the debug URL flag is present) so timings can be inspected without appearing in the normal UI. Verify the component's usage instructions before implementing."
+          "description": "Create a small wrapper hook around the existing useActorReady that exposes a stabilized connection state for UI gating (e.g., introduces a short minimum loading duration and/or a debounce to avoid rapid toggling when actor is created/invalidated). Use this hook from the onboarding page to decide disabled/loading state."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Stop redundant startup refetch storms by changing actor-change behavior in useActor to invalidate once without immediate multi-refetch cascades.",
+      "summary": "Make onboarding readiness UI stable and non-flickering while backend connection state changes, showing a consistent connecting experience without exposing technical terms.",
       "acceptanceCriteria": [
-        "On first authenticated load, getCallerUserProfile is executed at most once (no duplicate network calls caused by actor initialization side-effects).",
-        "On first authenticated load, getActivatedClientSummaries and getNonActivatedClientSummaries are each executed at most once.",
-        "Changing identity (logout/login) still results in stale data being cleared and fresh data being fetched correctly for the new identity."
+        "Onboard Client page does not rapidly toggle between enabled and disabled states when the actor changes (e.g., after login, refresh, or canister upgrade).",
+        "Loading indicator and copy are in English and do not expose internal technical terms like \"actor\" to the end user (e.g., prefer \"Connecting…\" / \"Preparing the app…\")."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useActor.ts",
+          "path": "frontend/src/hooks/useStableActorConnection.ts",
           "operation": "modify",
-          "description": "Adjust the actor-change effect to avoid calling refetchQueries for all dependent queries; instead invalidate once (prefer refetchType='active' so only mounted queries refetch) and add a guard so the invalidation runs once per actor/identity change, preventing repeated invalidation loops during startup."
+          "description": "Implement stabilization logic for connection readiness (debounce/hysteresis) so transient actor invalidation windows don't cause rapid UI state flips. Provide a simple API (e.g., { isConnecting, isReady }) that the onboarding page can consume for consistent rendering."
         },
         {
-          "path": "frontend/src/hooks/useActorReady.ts",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
           "operation": "modify",
-          "description": "Re-evaluate the delayed actorReady signaling to ensure it still prevents queries from mounting during actor-change invalidation windows after the useActor invalidation/refetch behavior is changed; keep behavior stable across login/logout transitions."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Ensure query keys and enabled conditions remain actor/identity-scoped and do not trigger extra refetches due to actor readiness transitions; rely on invalidation + mounted queries rather than forced refetch storms."
+          "description": "Render a stable connecting/initializing state driven by the stabilized readiness hook: show a non-flickering loader + English copy (e.g., \"Connecting…\" / \"Preparing the app…\") and keep the form controls disabled until the ready signal is stable. Avoid flashing between enabled/disabled by relying only on the stabilized state for UI."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Render the authenticated app shell quickly without blocking on profile fetch; show an English in-content loading and a retry-able error state.",
+      "summary": "Normalize actor-not-ready errors into friendly English and ensure the onboarding flow never displays the literal \"Actor not available\" message.",
       "acceptanceCriteria": [
-        "After authentication, the app shell (navigation/layout) renders quickly and shows an in-content loading state rather than a full-screen block for extended durations.",
-        "User-facing loading text is in English.",
-        "If the profile request errors, the UI shows a non-technical error message and a visible Retry button that re-attempts the profile query."
+        "If a thrown error message includes \"Actor not available\", the displayed message is replaced with a user-friendly English message (e.g., \"The app is still starting up. Please try again in a few seconds.\").",
+        "No user-facing toast or inline error in the onboarding flow displays the literal string \"Actor not available\"."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/App.tsx",
+          "path": "frontend/src/utils/errors.ts",
           "operation": "modify",
-          "description": "Change profile gating so ThemeProvider + AppLayout render immediately after authentication; in the main content area render: (1) an English loading state while profile loads, (2) a friendly error message + Retry button on failure, (3) ProfileSetupDialog when profile is confirmed missing, else render routed pages."
+          "description": "Extend normalizeError to explicitly detect actor-not-ready conditions (including message containing \"Actor not available\") and replace them with a friendly English startup message. Ensure the returned message never contains the literal substring \"Actor not available\"."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
           "operation": "modify",
-          "description": "Ensure the profile query exposes an actionable refetch for the Retry button and returns correct loading/fetched flags; keep user-facing text English in any surfaced states."
-        }
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "summary": "Use a single combined backend call for first-screen initial data on startup and update frontend queries to prefer it for initial dashboard load.",
-      "acceptanceCriteria": [
-        "Backend exposes a new query method that returns both the caller profile and the client summaries needed by the dashboard in one response payload.",
-        "Frontend initial dashboard load uses the new combined method (reducing the number of canister calls required for initial render).",
-        "Existing individual methods (e.g., getCallerUserProfile, getActivatedClientSummaries, getNonActivatedClientSummaries) continue to work for non-initial flows, unless explicitly replaced throughout the app.",
-        "No state migration is introduced unless a persistent data schema change is required (prefer no migration for this performance change)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Add a new startup query hook that calls the existing combined backend capability (getAppInitData) and seeds React Query caches for both ['currentUserProfile', identityKey] and ['clientSummaries', identityKey] from the single response; ensure this hook is used only for initial authenticated startup and does not break existing individual queries."
+          "description": "Ensure onboarding error surfaces only normalized messages: keep using normalizeError for toasts, and avoid emitting any toast/inline error when the form is disabled due to connecting state (so edge-case submission attempts cannot leak raw errors)."
         },
         {
           "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Use the combined init-data hook during authenticated startup so the first screen can be driven by a single call; keep existing profile setup flow (missing profile) working and ensure the shell still renders immediately while init data is loading."
-        },
-        {
-          "path": "frontend/src/pages/DashboardPage.tsx",
-          "operation": "modify",
-          "description": "Ensure dashboard data usage benefits from caches seeded by the combined init-data call (so initial dashboard render does not require additional calls beyond the combined fetch) while preserving current component behavior."
-        }
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "summary": "Tune React Query caching for startup profile and summaries to prevent unnecessary refetching for the first minute unless identity changes or explicit invalidation occurs.",
-      "acceptanceCriteria": [
-        "Within 60 seconds of app startup (no identity change), navigating between routes does not trigger additional refetches of profile/summaries unless explicitly invalidated by a mutation.",
-        "After a mutation that invalidates summaries (e.g., create client/activate/pause/renew), summaries refetch correctly.",
-        "Caching behavior remains correctly scoped per-identity (no cross-user data leakage)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Set appropriate staleTime/gcTime for the startup-critical queries (current user profile, client summaries, and combined init data if added) and disable eager refetch triggers (e.g., window focus/reconnect/mount) during the first minute; keep identityKey in query keys to scope caches per-identity and ensure existing mutation invalidations still trigger refetch when needed."
-        },
-        {
-          "path": "frontend/src/main.tsx",
-          "operation": "modify",
-          "description": "If needed to enforce consistent startup caching behavior, configure QueryClient defaultOptions for queries (without impacting non-startup flows) to reduce unnecessary refetch triggers during the first minute; keep changes minimal and aligned with the tuned per-query settings."
+          "description": "Prevent raw technical errors from being displayed in the global init error UI by replacing the direct error.message rendering with normalizeError(error) (still logging raw error to console). This reduces the chance of \"Actor not available\" being shown anywhere user-facing during initialization windows."
         }
       ]
     }

@@ -1,109 +1,70 @@
 {
   "kind": "build_request",
-  "title": "Reduce initial screen load time (first screen takes 2–3 minutes)",
-  "priority": "high",
+  "title": "Stabilize onboarding flow to prevent “Actor not available” errors",
+  "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Instrument and surface initial-load timings so we can identify where the 2–3 minute delay occurs (actor creation, access-control initialization, profile fetch, summaries fetch). Add a lightweight in-app debug log (console + optional hidden UI panel) that records timestamps and durations for: actor creation start/end, `_initializeAccessControlWithSecret` start/end, `getCallerUserProfile` start/end, and the first `clientSummaries` fetch start/end.",
+      "text": "Prevent the Onboard Client flow from submitting any backend mutations until the backend actor is fully ready, so onboarding never surfaces the raw error text \"Actor not available\" during normal loading/upgrade windows.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "first screenloading taking more than 2-3 mins"
+          "\" Actor not available \" Showing this error  while onboarding the client stabilize the loading so this error doesn’t appear again"
         ]
       },
       "acceptanceCriteria": [
-        "On a fresh load, the browser console shows a single, clearly labeled timing report for initial load steps (actor, access-control init, profile query, summaries query).",
-        "Timing instrumentation does not appear in normal UI by default (only console, or a hidden toggle such as a URL param).",
-        "Instrumentation does not modify any files under frontend/src/components/ui or other immutablePaths."
+        "On Onboard Client page, the \"Create Client\" action is disabled (and cannot submit via Enter) until the backend actor is ready.",
+        "While waiting for actor readiness, the page shows a clear loading/disabled state (English text) indicating the app is connecting/initializing.",
+        "Attempting to onboard during an actor-not-ready window does not show a toast or inline message containing the literal text \"Actor not available\".",
+        "Once the actor becomes ready, the form becomes usable automatically without requiring a manual refresh."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Prevent redundant query refetch storms during startup by adjusting the actor-change invalidation behavior in `frontend/src/hooks/useActor.ts`. Ensure that when the actor becomes available, dependent queries are not immediately force-refetched multiple times; instead, invalidate once and let mounted queries refetch normally (or refetch only the minimal set required for the current route).",
+      "text": "Update the onboarding page UI to handle actor readiness explicitly: show a stable, non-flickering loading experience and avoid transient enable/disable states while the actor is being created/invalidated.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "first screenloading taking more than 2-3 mins"
+          "stabilize the loading so this error doesn’t appear again"
         ]
       },
       "acceptanceCriteria": [
-        "On first authenticated load, `getCallerUserProfile` is executed at most once (no duplicate network calls caused by actor initialization side-effects).",
-        "On first authenticated load, `getActivatedClientSummaries` and `getNonActivatedClientSummaries` are each executed at most once.",
-        "Changing identity (logout/login) still results in stale data being cleared and fresh data being fetched correctly for the new identity."
+        "Onboard Client page does not rapidly toggle between enabled and disabled states when the actor changes (e.g., after login, refresh, or canister upgrade).",
+        "Loading indicator and copy are in English and do not expose internal technical terms like \"actor\" to the end user (e.g., prefer \"Connecting…\" / \"Preparing the app…\")."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Reduce time-to-first-render for the authenticated app by updating the profile gating in `frontend/src/App.tsx` to avoid blocking the entire app UI on slow profile fetches. Keep the app responsive by rendering the shell (theme + layout) quickly and showing a clear, English loading state in the main content area while profile data loads, with a retry action if the profile request fails.",
+      "text": "Harden error normalization so that if an actor-not-ready error still occurs (edge cases), the user-facing message is friendly English and does not display \"Actor not available\" verbatim.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-4"
         ],
         "quotes": [
-          "first screenloading taking more than 2-3 mins"
+          "\" Actor not available \" Showing this error"
         ]
       },
       "acceptanceCriteria": [
-        "After authentication, the app shell (navigation/layout) renders quickly and shows an in-content loading state rather than a full-screen block for extended durations.",
-        "User-facing loading text is in English.",
-        "If the profile request errors, the UI shows a non-technical error message and a visible Retry button that re-attempts the profile query."
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Add a backend method that returns the minimal data needed for the first screen in a single canister call (e.g., current user profile + client summaries for the dashboard) and update frontend queries to use this single call on initial load instead of multiple round trips.",
-      "target": "both",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "first screenloading taking more than 2-3 mins"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Backend exposes a new query method that returns both the caller profile and the client summaries needed by the dashboard in one response payload.",
-        "Frontend initial dashboard load uses the new combined method (reducing the number of canister calls required for initial render).",
-        "Existing individual methods (e.g., `getCallerUserProfile`, `getActivatedClientSummaries`, `getNonActivatedClientSummaries`) continue to work for non-initial flows, unless explicitly replaced throughout the app.",
-        "No state migration is introduced unless a persistent data schema change is required (prefer no migration for this performance change)."
-      ]
-    },
-    {
-      "id": "REQ-5",
-      "text": "Tune React Query caching for initial-load queries to avoid unnecessary refetching during startup. Specifically, set appropriate `staleTime`/`gcTime` (cache time) for the current-user profile and client summaries queries so they do not refetch repeatedly during the first minute unless identity changes or an explicit mutation invalidation occurs.",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-4"
-        ],
-        "quotes": [
-          "first screenloading taking more than 2-3 mins"
-        ]
-      },
-      "acceptanceCriteria": [
-        "Within 60 seconds of app startup (no identity change), navigating between routes does not trigger additional refetches of profile/summaries unless explicitly invalidated by a mutation.",
-        "After a mutation that invalidates summaries (e.g., create client/activate/pause/renew), summaries refetch correctly.",
-        "Caching behavior remains correctly scoped per-identity (no cross-user data leakage)."
+        "If a thrown error message includes \"Actor not available\", the displayed message is replaced with a user-friendly English message (e.g., \"The app is still starting up. Please try again in a few seconds.\").",
+        "No user-facing toast or inline error in the onboarding flow displays the literal string \"Actor not available\"."
       ]
     }
   ],
   "constraints": [
-    "Backend must remain single-actor (all Motoko logic in backend/main.mo).",
-    "Do not edit any frontend files under the immutablePaths list (including frontend/src/components/ui, frontend/src/hooks/useInternetIdentity.ts(x), frontend/src/hooks/useActor.ts listed as immutable? (Only immutablePaths are protected; still avoid changes to the listed immutable ones).",
+    "Do not edit files under frontend immutablePaths (including frontend/src/hooks/useActor.ts and Internet Identity hooks).",
     "Use English for any user-facing text."
   ],
   "nonGoals": [
-    "Adding new product features unrelated to load-time performance.",
-    "Switching frameworks or introducing external databases/services.",
-    "Implementing real-time updates (WebSockets/push)."
+    "Do not add new authentication providers (Internet Identity remains the only auth).",
+    "Do not introduce new backend services or databases.",
+    "Do not change backend canister interfaces unless strictly required to achieve the loading stabilization."
   ],
   "imageRequirements": {
     "required": [],

@@ -10,6 +10,11 @@ export function normalizeError(error: unknown): string {
   if (error instanceof Error) {
     const message = error.message;
     
+    // Normalize actor-not-ready errors
+    if (message.includes('Actor not available')) {
+      return 'The app is still starting up. Please try again in a few seconds.';
+    }
+    
     // Normalize common backend trap messages
     if (message.includes('Cannot directly set onboarding state to full')) {
       return 'Please complete onboarding steps individually';
@@ -45,6 +50,10 @@ export function normalizeError(error: unknown): string {
 
   // Handle string errors
   if (typeof error === 'string') {
+    // Check for actor-not-ready in string errors too
+    if (error.includes('Actor not available')) {
+      return 'The app is still starting up. Please try again in a few seconds.';
+    }
     return error;
   }
 

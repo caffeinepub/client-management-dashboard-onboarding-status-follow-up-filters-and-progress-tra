@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCreateClient } from '../hooks/useQueries';
 import { useRouter } from '../hooks/useRouter';
+import { useStableActorConnection } from '../hooks/useStableActorConnection';
 import { OnboardingState } from '../backend';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { UserPlus, CheckCircle2 } from 'lucide-react';
+import { UserPlus, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { computeTotalPlanDays } from '../utils/plan';
 import { formatClientCode } from '../utils/clientCode';
 import { normalizeError } from '../utils/errors';
 
@@ -31,6 +31,7 @@ const onboardingStates: { value: OnboardingState; label: string; description: st
 export function OnboardClientPage() {
   const { navigate } = useRouter();
   const createClient = useCreateClient();
+  const { isConnecting, isReady } = useStableActorConnection();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -41,8 +42,17 @@ export function OnboardClientPage() {
 
   const [createdClientCode, setCreatedClientCode] = useState<bigint | null>(null);
 
+  // Determine if the form can be interacted with
+  const canInteract = isReady && !createClient.isPending;
+  const isFormDisabled = !canInteract;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Guard: prevent submission if not ready
+    if (!canInteract) {
+      return;
+    }
 
     if (!formData.name.trim()) {
       toast.error('Please enter client name');
@@ -67,6 +77,13 @@ export function OnboardClientPage() {
     } catch (error) {
       toast.error(normalizeError(error));
       console.error('Onboarding error:', error);
+    }
+  };
+
+  // Prevent Enter key submission when disabled
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !canInteract) {
+      e.preventDefault();
     }
   };
 
@@ -113,6 +130,27 @@ export function OnboardClientPage() {
     );
   }
 
+  // Show connecting state while backend is initializing
+  if (isConnecting) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <CardContent className="pt-12 pb-12">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+              <div>
+                <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
+                <p className="text-muted-foreground">
+                  Preparing the app, please wait a moment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -120,7 +158,7 @@ export function OnboardClientPage() {
         <p className="text-muted-foreground mt-1">Add a new client to your fitness program</p>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -143,7 +181,7 @@ export function OnboardClientPage() {
                     placeholder="Enter client's full name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    disabled={createClient.isPending}
+                    disabled={isFormDisabled}
                   />
                 </div>
 
@@ -157,7 +195,7 @@ export function OnboardClientPage() {
                     placeholder="Enter mobile number"
                     value={formData.mobileNumber}
                     onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
-                    disabled={createClient.isPending}
+                    disabled={isFormDisabled}
                   />
                 </div>
 
@@ -170,7 +208,7 @@ export function OnboardClientPage() {
                     onValueChange={(value) =>
                       setFormData({ ...formData, onboardingState: value as OnboardingState })
                     }
-                    disabled={createClient.isPending}
+                    disabled={isFormDisabled}
                   >
                     <SelectTrigger id="onboardingState">
                       <SelectValue />
@@ -198,7 +236,7 @@ export function OnboardClientPage() {
                     placeholder="Add any additional notes about the client..."
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    disabled={createClient.isPending}
+                    disabled={isFormDisabled}
                     rows={4}
                   />
                 </div>
@@ -208,12 +246,12 @@ export function OnboardClientPage() {
             <div className="flex gap-3 pt-4 border-t">
               <Button
                 type="submit"
-                disabled={createClient.isPending || !formData.name.trim() || !formData.mobileNumber.trim()}
+                disabled={isFormDisabled || !formData.name.trim() || !formData.mobileNumber.trim()}
                 className="flex-1"
               >
                 {createClient.isPending ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
                 ) : (
@@ -224,7 +262,7 @@ export function OnboardClientPage() {
                 type="button"
                 variant="outline"
                 onClick={() => navigate('clients')}
-                disabled={createClient.isPending}
+                disabled={isFormDisabled}
               >
                 Cancel
               </Button>

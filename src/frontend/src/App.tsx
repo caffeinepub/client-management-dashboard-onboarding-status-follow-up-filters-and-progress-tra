@@ -11,6 +11,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { InitialLoadDebugPanel } from './components/debug/InitialLoadDebugPanel';
 import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
+import { normalizeError } from './utils/errors';
 
 // Lazy load page components for code splitting
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -56,7 +57,7 @@ function App() {
               </p>
               {error && (
                 <p className="text-sm text-muted-foreground">
-                  {error instanceof Error ? error.message : 'Unknown error'}
+                  {normalizeError(error)}
                 </p>
               )}
               <Button onClick={() => refetch()}>
