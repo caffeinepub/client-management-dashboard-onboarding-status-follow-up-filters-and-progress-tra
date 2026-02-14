@@ -1,42 +1,59 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [
-    "Investigate persistent slow connection establishment to backend despite good network (possible client agent config, repeated identity/auth flows, inefficient initialization, or backend call latency)."
-  ],
-  "known_issues": [
-    "App is slow every time when establishing connection to backend; user reports network is good and requests code review for performance regression."
-  ],
-  "isFixRequest": true,
+  "summary": "Theme/UI enhancement pass: enable dark mode and improve visual design (bold colors, heading styles, appealing layout).",
+  "architectural_notes": [],
+  "known_issues": [],
+  "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-fix-the-frontend-backend-readiness-polling-so-it-does-not-continuously-reset-and-re-poll-due-to-state-changes-and-so-it-performs-bounded-exponential-backoff-until-readiness-is-confirmed",
-      "title": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
+      "id": "feature-add-an-in-app-dark-mode-capability-that-users-can-toggle-at-runtime-and-ensure-the-entire-ui-correctly-switches-between-light-and-dark-themes-using-class-based-dark-mode",
+      "title": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-reduce-unnecessary-query-invalidation-refetch-storms-when-the-actor-is-created-changes-to-avoid-repeated-backend-calls-that-can-make-the-app-feel-like-it-is-re-connecting-on-every-interaction",
-      "title": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
+      "id": "feature-update-the-global-color-palette-tokens-for-both-light-and-dark-modes-to-use-a-more-vivid-bold-and-high-contrast-scheme-while-keeping-text-readable-and-accessible-and-apply-it-consistently-across-the-app",
+      "title": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-explicit-client-side-performance-instrumentation-for-actor-creation-and-backend-readiness-isready-so-slow-connection-setup-can-be-diagnosed-from-the-browser-when-the-debug-flag-is-enabled",
-      "title": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
+      "id": "feature-improve-typography-hierarchy-by-making-page-titles-and-section-headings-more-prominent-bold-consistent-sizing-spacing-and-tracking-and-ensure-a-cohesive-layout-rhythm-across-the-main-pages",
+      "title": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-apply-one-coherent-visual-theme-direction-across-the-app-colors-typography-surfaces-and-interactive-states-that-looks-modern-and-bold-while-remaining-professional-for-a-crm-fitness-coaching-context",
+      "title": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "projectName": "Investigate and fix persistent slow backend connection by stabilizing readiness polling and query refetch behavior",
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Enable dark mode theme for the page",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Refresh UI styling: bold color palette, improved title/heading typography, and more appealing layout",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Enable dark mode + bold visual theme (colors, headings, layout)",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

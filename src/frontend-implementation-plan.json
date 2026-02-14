@@ -1,84 +1,143 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Stabilize backend readiness polling, reduce React Query refetch storms, and add debug timing instrumentation",
+  "title": "Dark mode toggle + bold, high-contrast CRM theme (colors + typography + layout)",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Stabilize backend readiness polling so retries don't reset on state changes and use bounded exponential backoff with proper timer cleanup.",
+      "summary": "Add a runtime theme toggle (Light/Dark/System) using class-based dark mode via existing next-themes ThemeProvider.",
       "acceptanceCriteria": [
-        "When authenticated, the app should not stay stuck on the \"Connecting... / Establishing connection to backend\" screen indefinitely under normal conditions.",
-        "The readiness check must not reset its internal retry counter on every retry attempt (i.e., retry scheduling should not cause the effect to restart and reinitialize state).",
-        "After readiness becomes true once, subsequent renders/navigation must not trigger repeated readiness polling unless identity/actor truly changes.",
-        "Readiness polling must clean up timers correctly to avoid multiple concurrent polling loops."
+        "A theme toggle control is available in the authenticated app UI (e.g., header user menu) with options at minimum: Light, Dark, and System.",
+        "Toggling theme updates the document theme class (via the existing next-themes ThemeProvider usage) and immediately updates colors across pages (Login, Dashboard, Clients, Onboard, Client Profile).",
+        "Theme selection persists across refresh (next-themes persistence).",
+        "No changes are made to any files listed under frontend immutablePaths."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useBackendReadiness.ts",
-          "operation": "modify",
-          "description": "Refactor readiness polling to avoid using retryCount as a useEffect dependency (prevent effect restarts). Use refs to track retry attempt count, active timer id, and an in-flight flag; implement bounded exponential backoff (cap delay and cap attempt growth) and ensure a single polling loop per actor instance with robust cleanup on actor/identity change."
+          "path": "frontend/src/components/theme/ThemeToggleMenu.tsx",
+          "operation": "create",
+          "description": "Create a small authenticated-UI theme switcher that uses next-themes (useTheme) to set theme to Light/Dark/System and renders as dropdown menu items suitable for placing in the header user menu."
         },
         {
-          "path": "frontend/src/hooks/useStableActorConnection.ts",
+          "path": "frontend/src/components/layout/AppLayout.tsx",
           "operation": "modify",
-          "description": "Align connection gating with the updated readiness hook semantics (e.g., ensure connecting/ready transitions are driven solely by the stabilized isChecking/isReady signals and do not re-trigger readiness work)."
+          "description": "Wire the new ThemeToggleMenu into the authenticated header user dropdown, adding Light/Dark/System options and ensuring the control is discoverable alongside logout."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Confirm ThemeProvider configuration remains class-based (attribute=\"class\") and supports System theme; adjust defaults only if needed to align with Light/Dark/System toggle behavior without changing routing/auth logic."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Prevent global query invalidation/refetch storms on actor creation/changes by relying on enabled queries and stable cache keys instead of unconditional refetching.",
+      "summary": "Refresh global semantic color tokens for a vivid, bold, high-contrast palette across light and dark modes, avoiding hard-coded colors in page components.",
       "acceptanceCriteria": [
-        "Actor creation should not immediately trigger a refetch of all non-actor queries multiple times in quick succession.",
-        "React Query caches should remain stable across normal navigation; backend calls should be driven by enabled queries becoming active, not by unconditional global refetches.",
-        "Manual testing: after initial load, clicking around dashboard/clients/client pages should not repeatedly show the global connecting screen or cause repeated initial-data fetch patterns without an identity change."
+        "Global theme variables are updated (in the active global Tailwind theme CSS) so that primary/secondary/accent/muted/border/ring and chart colors look noticeably bolder in both light and dark mode.",
+        "Primary actions (buttons/active nav states), key highlights (badges/metrics), and hover states visibly reflect the updated palette without reducing legibility.",
+        "Dark mode background is a deep neutral (near-black/charcoal) with clear separation between background, card, and popover surfaces.",
+        "No hard-coded colors are introduced in page components where semantic tokens (bg-background, text-foreground, bg-card, text-muted-foreground, text-primary, bg-accent, etc.) can be used instead."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useActor.ts",
+          "path": "frontend/src/index.css",
           "operation": "modify",
-          "description": "Replace unconditional invalidateQueries+refetchQueries-on-actor-change behavior with a more targeted approach: only react when the actor instance truly changes (track previous actor in a ref), avoid global refetches, and prefer letting enabled queries fetch naturally when active. Keep the existing Internet Identity flow intact."
+          "description": "Update the OKLCH CSS variables for :root and .dark to a bolder, higher-contrast palette (primary/secondary/accent/muted/border/ring + chart colors) while preserving readability and clear surface separation (background/card/popover)."
         },
         {
-          "path": "frontend/src/hooks/useActorReady.ts",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
           "operation": "modify",
-          "description": "Review and adjust the actorReady timing signal (if needed) to ensure actor transitions don't cause query thrash (e.g., avoid repeated toggling during actor recreation) while preserving the intent of preventing queries from mounting during actor-change windows."
+          "description": "Replace any hard-coded success/brand colors (e.g., green-*) with semantic theme tokens (primary/accent/muted/destructive) so the palette changes apply consistently in both light/dark."
+        },
+        {
+          "path": "frontend/src/components/auth/LoginGate.tsx",
+          "operation": "modify",
+          "description": "Ensure hero/gradient/illustrative styling relies on semantic tokens (background/accent/primary/muted) and does not introduce new hard-coded colors that bypass the global palette."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Add debug-only client-side performance instrumentation for actor creation, backend readiness polling duration, and app init fetch timing, visible in the existing debug panel and/or console.",
+      "summary": "Establish a stronger, consistent typography hierarchy (titles/headings) and improve spacing rhythm across key pages and layout.",
       "acceptanceCriteria": [
-        "When the URL contains the existing debug flag, the app records timing events for: actor creation, readiness polling duration (time until first successful isReady), and app init data fetch.",
-        "The timing report is visible via the existing debug panel and/or console report without requiring code edits to enable it.",
-        "Instrumentation does not change user-facing behavior when debug is not enabled."
+        "Page titles (e.g., \"Dashboard\", \"Clients\") render with a consistent, strong hierarchy (size/weight/tracking) across pages.",
+        "Section headings inside cards/dialogs/forms also follow a consistent heading scale (e.g., h2/h3 styles) with appropriate spacing.",
+        "Global base styles include sensible defaults for h1–h4 (or a shared utility pattern) so headings look consistent without repetitive per-page styling.",
+        "Key screens (DashboardPage, ClientsListPage, LoginGate, AppLayout header/footer) have improved spacing and alignment for an overall cleaner, more visually appealing layout without changing app functionality."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/initialLoadTimings.ts",
+          "path": "frontend/src/index.css",
           "operation": "modify",
-          "description": "Adjust the timing utility so it is gated by the existing debug flag (no console output and minimal overhead when debug is disabled). Ensure reporting does not permanently freeze timing collection (allow actor creation/readiness events even if an initial report already occurred)."
+          "description": "Add/adjust global base typography styles for h1–h4 (size/weight/tracking/spacing) and supporting rhythm defaults (e.g., consistent margins for headings) using Tailwind @layer base so pages can rely on shared hierarchy."
         },
         {
-          "path": "frontend/src/hooks/useActor.ts",
+          "path": "frontend/src/pages/DashboardPage.tsx",
           "operation": "modify",
-          "description": "Add debug-only timing marks for actor creation (e.g., start before createActorWithConfig and end after access-control initialization completes) using the existing timings utility, without altering the authentication behavior."
+          "description": "Align page header structure with the global heading hierarchy (use consistent heading elements/classes) and tighten spacing for a cleaner dashboard layout without changing metrics/dialog behavior."
         },
         {
-          "path": "frontend/src/hooks/useBackendReadiness.ts",
+          "path": "frontend/src/pages/ClientsListPage.tsx",
           "operation": "modify",
-          "description": "Add debug-only timing marks for backend readiness polling duration (start when polling begins for a new actor; end on the first successful readiness confirmation). Ensure retries do not create multiple overlapping timing events."
+          "description": "Normalize the page title/subtitle hierarchy and header row spacing (title, actions, search/filter controls) to match the new global typography rhythm without changing filtering/export behavior."
         },
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
           "operation": "modify",
-          "description": "Ensure app init fetch timing is recorded under the debug flag (keep/standardize the existing 'app-init-data-fetch' event), and ensure reporting is invoked in a way that keeps the debug panel updated while avoiding unintended console output when debug is disabled."
+          "description": "Apply the consistent page-title/section-heading hierarchy to the onboarding header and review section headings, improving spacing/scanability while preserving the wizard flow and validation logic."
         },
         {
-          "path": "frontend/src/components/debug/InitialLoadDebugPanel.tsx",
+          "path": "frontend/src/pages/ClientProfilePage.tsx",
           "operation": "modify",
-          "description": "Update the debug panel (without editing any files under frontend/src/components/ui) to display the added timing labels clearly (actor creation and backend readiness) and ensure it remains driven by the existing debug flag."
+          "description": "Apply consistent title/heading hierarchy for the client name header and section card titles; refine spacing between header, summary cards, and tab sections without changing client actions or data rendering."
+        },
+        {
+          "path": "frontend/src/components/layout/AppLayout.tsx",
+          "operation": "modify",
+          "description": "Refine header/footer layout rhythm (container padding, vertical alignment, nav spacing) to better match the updated typography scale while preserving routes/navigation behavior."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Apply a cohesive modern, bold, professional visual theme across surfaces and interactive states (header/nav/cards/dialogs/tables/empty states) with no backend changes.",
+      "acceptanceCriteria": [
+        "The UI uses a consistent theme style across header, navigation, cards, dialogs, tables, and empty states (no mixed styling patterns).",
+        "Theme direction avoids generic default styling by using clear surface elevation (subtle shadows/borders), purposeful accent usage, and consistent rounding.",
+        "The chosen theme does not rely on a blue/purple primary palette (unless already present and explicitly kept); it should look distinct and intentional.",
+        "No backend changes are required for the theme update."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/index.css",
+          "operation": "modify",
+          "description": "Adjust global base styles to reinforce a consistent surface system (background/card/popover separation), interactive focus/hover affordances via semantic tokens, and consistent rounding/elevation cues aligned with the updated palette."
+        },
+        {
+          "path": "frontend/src/components/layout/AppLayout.tsx",
+          "operation": "modify",
+          "description": "Unify header/nav styling patterns (active vs inactive states, surface translucency, borders/shadows) and ensure all styling continues to use semantic tokens for both light/dark modes."
+        },
+        {
+          "path": "frontend/src/pages/DashboardPage.tsx",
+          "operation": "modify",
+          "description": "Ensure metric cards and hover states consistently reflect the new bold theme direction (semantic accents, subtle elevation) without introducing hard-coded colors or altering behavior."
+        },
+        {
+          "path": "frontend/src/pages/ClientsListPage.tsx",
+          "operation": "modify",
+          "description": "Ensure list cards and empty states match the same surface/elevation/hover treatment used elsewhere, relying on semantic tokens and consistent rounding."
+        },
+        {
+          "path": "frontend/src/pages/ClientProfilePage.tsx",
+          "operation": "modify",
+          "description": "Ensure section cards, tabs, and dialogs align with the unified theme direction (surfaces, borders, interactive states) while keeping all existing client-management functionality intact."
+        },
+        {
+          "path": "frontend/src/components/auth/LoginGate.tsx",
+          "operation": "modify",
+          "description": "Bring the unauthenticated login screen styling (hero surface, emphasis, spacing) in line with the cohesive bold theme using the shared token system."
         }
       ]
     }

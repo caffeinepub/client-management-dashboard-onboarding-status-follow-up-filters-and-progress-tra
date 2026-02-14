@@ -135,12 +135,12 @@ export function ClientsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
-          <p className="text-muted-foreground mt-1">Manage your fitness coaching clients</p>
+          <h1>Clients</h1>
+          <p className="text-muted-foreground mt-2">Manage your fitness coaching clients</p>
         </div>
-        <Button onClick={() => navigate('onboard')}>
+        <Button onClick={() => navigate('onboard')} className="font-semibold">
           <Users className="mr-2 h-4 w-4" />
           Onboard New Client
         </Button>
@@ -166,6 +166,7 @@ export function ClientsListPage() {
             variant="outline"
             onClick={handleExport}
             disabled={prepareExport.isPending || filteredSummaries.length === 0}
+            className="font-semibold"
           >
             {prepareExport.isPending ? (
               <>
@@ -183,17 +184,17 @@ export function ClientsListPage() {
       </div>
 
       {filteredSummaries.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No clients found</h3>
-            <p className="text-muted-foreground mb-4">
+        <Card className="border-2">
+          <CardContent className="py-16 text-center">
+            <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl font-bold mb-2">No clients found</h3>
+            <p className="text-muted-foreground mb-6">
               {searchQuery.trim()
                 ? 'Try adjusting your search or filter criteria'
                 : 'Get started by onboarding your first client'}
             </p>
             {!searchQuery.trim() && (
-              <Button onClick={() => navigate('onboard')}>
+              <Button onClick={() => navigate('onboard')} className="font-semibold">
                 <Users className="mr-2 h-4 w-4" />
                 Onboard New Client
               </Button>
@@ -201,7 +202,7 @@ export function ClientsListPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {filteredSummaries.map((client) => {
             const displayStatus = getDisplayStatus(client);
             const endDate = client.subscriptionSummary?.endDate;
@@ -209,30 +210,30 @@ export function ClientsListPage() {
             return (
               <Card
                 key={client.code.toString()}
-                className="cursor-pointer transition-colors hover:bg-accent"
+                className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
                 onClick={() => navigate(`client/${client.code.toString()}`)}
               >
                 <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-lg truncate">{client.name}</h3>
-                        <p className="text-sm text-muted-foreground">
+                        <h3 className="font-bold text-lg truncate">{client.name}</h3>
+                        <p className="text-sm text-muted-foreground font-medium">
                           {formatClientCode(client.code.toString())}
                         </p>
                       </div>
                       <ClientStatusBadge status={displayStatus} />
                     </div>
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-2.5 text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5" />
-                        <span>{client.mobileNumber}</span>
+                        <Phone className="h-4 w-4 flex-shrink-0" />
+                        <span className="font-medium">{client.mobileNumber}</span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>
-                          {endDate ? `Ends: ${formatDate(endDate)}` : 'Ends: —'}
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span className="font-medium">
+                          {endDate ? formatDate(endDate) : '—'}
                         </span>
                       </div>
                     </div>
@@ -247,9 +248,9 @@ export function ClientsListPage() {
       {showExportDialog && exportClients && (
         <Suspense fallback={null}>
           <ExportClientsExcelDialog
-            clients={exportClients}
             open={showExportDialog}
             onOpenChange={setShowExportDialog}
+            clients={exportClients}
           />
         </Suspense>
       )}

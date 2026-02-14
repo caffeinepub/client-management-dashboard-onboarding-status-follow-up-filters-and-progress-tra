@@ -1,77 +1,95 @@
 {
   "kind": "build_request",
-  "title": "Investigate and fix persistent slow backend connection by stabilizing readiness polling and query refetch behavior",
+  "title": "Enable dark mode + bold visual theme (colors, headings, layout)",
   "priority": "normal",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the frontend backend-readiness polling so it does not continuously reset and re-poll due to state changes, and so it performs bounded exponential backoff until readiness is confirmed.",
+      "text": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages-user-4"
+          "msg-1"
         ],
         "quotes": [
-          "network is good cross check the codes"
+          "Enable the dark mode of the page"
         ]
       },
       "acceptanceCriteria": [
-        "When authenticated, the app should not stay stuck on the \"Connecting... / Establishing connection to backend\" screen indefinitely under normal conditions.",
-        "The readiness check must not reset its internal retry counter on every retry attempt (i.e., retry scheduling should not cause the effect to restart and reinitialize state).",
-        "After readiness becomes true once, subsequent renders/navigation must not trigger repeated readiness polling unless identity/actor truly changes.",
-        "Readiness polling must clean up timers correctly to avoid multiple concurrent polling loops."
+        "A theme toggle control is available in the authenticated app UI (e.g., header user menu) with options at minimum: Light, Dark, and System.",
+        "Toggling theme updates the document theme class (via the existing next-themes ThemeProvider usage) and immediately updates colors across pages (Login, Dashboard, Clients, Onboard, Client Profile).",
+        "Theme selection persists across refresh (next-themes persistence).",
+        "No changes are made to any files listed under frontend immutablePaths."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Reduce unnecessary query invalidation/refetch storms when the actor is created/changes, to avoid repeated backend calls that can make the app feel like it is re-connecting on every interaction.",
+      "text": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages-user-2",
-          "recent-messages-user-4"
+          "msg-1"
         ],
         "quotes": [
-          "got slow again taking much time to establish connection to backend",
-          "network is good cross check the codes"
+          "give some good bold colors"
         ]
       },
       "acceptanceCriteria": [
-        "Actor creation should not immediately trigger a refetch of all non-actor queries multiple times in quick succession.",
-        "React Query caches should remain stable across normal navigation; backend calls should be driven by enabled queries becoming active, not by unconditional global refetches.",
-        "Manual testing: after initial load, clicking around dashboard/clients/client pages should not repeatedly show the global connecting screen or cause repeated initial-data fetch patterns without an identity change."
+        "Global theme variables are updated (in the active global Tailwind theme CSS) so that primary/secondary/accent/muted/border/ring and chart colors look noticeably bolder in both light and dark mode.",
+        "Primary actions (buttons/active nav states), key highlights (badges/metrics), and hover states visibly reflect the updated palette without reducing legibility.",
+        "Dark mode background is a deep neutral (near-black/charcoal) with clear separation between background, card, and popover surfaces.",
+        "No hard-coded colors are introduced in page components where semantic tokens (bg-background, text-foreground, bg-card, text-muted-foreground, text-primary, bg-accent, etc.) can be used instead."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Add explicit client-side performance instrumentation for actor creation and backend readiness (isReady) so slow connection setup can be diagnosed from the browser when the debug flag is enabled.",
+      "text": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "recent-messages-user-2",
-          "recent-messages-user-4"
+          "msg-1"
         ],
         "quotes": [
-          "got slow again taking much time to establish connection to backend",
-          "network is good cross check the codes"
+          "headings to titles and good layout that is appealing to eyes"
         ]
       },
       "acceptanceCriteria": [
-        "When the URL contains the existing debug flag, the app records timing events for: actor creation, readiness polling duration (time until first successful isReady), and app init data fetch.",
-        "The timing report is visible via the existing debug panel and/or console report without requiring code edits to enable it.",
-        "Instrumentation does not change user-facing behavior when debug is not enabled."
+        "Page titles (e.g., \"Dashboard\", \"Clients\") render with a consistent, strong hierarchy (size/weight/tracking) across pages.",
+        "Section headings inside cards/dialogs/forms also follow a consistent heading scale (e.g., h2/h3 styles) with appropriate spacing.",
+        "Global base styles include sensible defaults for h1–h4 (or a shared utility pattern) so headings look consistent without repetitive per-page styling.",
+        "Key screens (DashboardPage, ClientsListPage, LoginGate, AppLayout header/footer) have improved spacing and alignment for an overall cleaner, more visually appealing layout without changing app functionality."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "Lets work on theme",
+          "good layout that is appealing to eyes"
+        ]
+      },
+      "acceptanceCriteria": [
+        "The UI uses a consistent theme style across header, navigation, cards, dialogs, tables, and empty states (no mixed styling patterns).",
+        "Theme direction avoids generic default styling by using clear surface elevation (subtle shadows/borders), purposeful accent usage, and consistent rounding.",
+        "The chosen theme does not rely on a blue/purple primary palette (unless already present and explicitly kept); it should look distinct and intentional.",
+        "No backend changes are required for the theme update."
       ]
     }
   ],
   "constraints": [
-    "Do not edit files under frontend/src/components/ui (read-only).",
-    "Do not edit frontend/src/hooks/useInternetIdentity.ts or frontend/src/hooks/useActor.ts in ways that break Internet Identity authentication; keep the existing auth flow intact.",
-    "Backend must remain single-actor in backend/main.mo; only add backend changes if strictly required for readiness/performance diagnostics."
+    "Frontend must remain React + TypeScript + Tailwind + shadcn UI + React Query.",
+    "Do not edit any files under frontend immutablePaths (compose existing UI components instead).",
+    "Backend remains single-actor; no backend changes are needed for theming."
   ],
   "nonGoals": [
-    "Do not add new third-party monitoring/analytics services.",
-    "Do not implement real-time features (WebSockets) or external databases.",
-    "Do not change product features unrelated to connection/performance (e.g., client management, follow-ups) beyond what is needed to diagnose/fix the slowness."
+    "Adding new application features (CRM logic, new pages, new data models, exports changes).",
+    "Introducing third-party theming libraries beyond the already-present next-themes integration.",
+    "Reworking authentication or backend connection logic."
   ],
   "imageRequirements": {
     "required": [],

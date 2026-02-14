@@ -146,30 +146,30 @@ export function OnboardClientPage() {
   if (createdClientCode !== null) {
     return (
       <div className="max-w-2xl mx-auto">
-        <Card>
+        <Card className="border-2">
           <CardContent className="pt-12 pb-12">
             <div className="text-center space-y-6">
-              <div className="h-16 w-16 rounded-full bg-green-600/10 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-10 w-10 text-primary" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold mb-2">Client Onboarded Successfully!</h2>
-                <p className="text-muted-foreground">
-                  Client code: <span className="font-semibold">{formatClientCode(createdClientCode.toString())}</span>
+                <h2 className="text-3xl font-bold mb-3">Client Onboarded Successfully!</h2>
+                <p className="text-muted-foreground text-lg">
+                  Client code: <span className="font-bold text-foreground">{formatClientCode(createdClientCode.toString())}</span>
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-                <Button onClick={handleCopyClientCode} variant="outline" className="gap-2">
+                <Button onClick={handleCopyClientCode} variant="outline" className="gap-2 font-semibold">
                   <Copy className="h-4 w-4" />
                   Copy Client Code
                 </Button>
-                <Button onClick={() => navigate(`client/${createdClientCode.toString()}`)}>
+                <Button onClick={() => navigate(`client/${createdClientCode.toString()}`)} className="font-semibold">
                   View Client Profile
                 </Button>
-                <Button variant="outline" onClick={handleReset}>
+                <Button variant="outline" onClick={handleReset} className="font-semibold">
                   Onboard Another Client
                 </Button>
-                <Button variant="ghost" onClick={() => navigate('clients')}>
+                <Button variant="ghost" onClick={() => navigate('clients')} className="font-semibold">
                   Back to Clients
                 </Button>
               </div>
@@ -184,12 +184,12 @@ export function OnboardClientPage() {
   if (isConnecting) {
     return (
       <div className="max-w-2xl mx-auto">
-        <Card>
+        <Card className="border-2">
           <CardContent className="pt-12 pb-12">
             <div className="text-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
               <div>
-                <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
+                <h2 className="text-xl font-bold mb-2">Connecting...</h2>
                 <p className="text-muted-foreground">
                   Preparing the app, please wait a moment.
                 </p>
@@ -211,8 +211,8 @@ export function OnboardClientPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Onboard New Client</h1>
-        <p className="text-muted-foreground mt-1">Add a new client to your fitness program</p>
+        <h1>Onboard New Client</h1>
+        <p className="text-muted-foreground mt-2">Add a new client to your fitness program</p>
       </div>
 
       <OnboardingWizard
@@ -230,7 +230,7 @@ export function OnboardClientPage() {
         {currentStep === 0 && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="name">
+              <Label htmlFor="name" className="font-semibold">
                 Client Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -247,12 +247,12 @@ export function OnboardClientPage() {
                 className={fieldErrors.name ? 'border-destructive' : ''}
               />
               {fieldErrors.name && (
-                <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                <p className="text-sm text-destructive font-medium">{fieldErrors.name}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="mobileNumber">
+              <Label htmlFor="mobileNumber" className="font-semibold">
                 Mobile Number <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -270,7 +270,7 @@ export function OnboardClientPage() {
                 className={fieldErrors.mobileNumber ? 'border-destructive' : ''}
               />
               {fieldErrors.mobileNumber ? (
-                <p className="text-sm text-destructive">{fieldErrors.mobileNumber}</p>
+                <p className="text-sm text-destructive font-medium">{fieldErrors.mobileNumber}</p>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Enter the client's mobile number in any format
@@ -284,7 +284,7 @@ export function OnboardClientPage() {
         {currentStep === 1 && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="onboardingState">
+              <Label htmlFor="onboardingState" className="font-semibold">
                 Onboarding Status <span className="text-destructive">*</span>
               </Label>
               <Select
@@ -301,7 +301,7 @@ export function OnboardClientPage() {
                   {onboardingStatusOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       <div className="py-1">
-                        <div className="font-medium">{option.label}</div>
+                        <div className="font-semibold">{option.label}</div>
                         <div className="text-xs text-muted-foreground max-w-xs">
                           {option.description}
                         </div>
@@ -314,7 +314,7 @@ export function OnboardClientPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Label htmlFor="notes" className="font-semibold">Notes (Optional)</Label>
               <Textarea
                 id="notes"
                 placeholder="Add any additional notes about the client..."
@@ -333,23 +333,23 @@ export function OnboardClientPage() {
         {/* Step 3: Review */}
         {currentStep === 2 && (
           <div className="space-y-6">
-            <div className="rounded-lg border bg-card p-6 space-y-4">
-              <h3 className="font-semibold text-lg">Review Client Information</h3>
+            <div className="rounded-lg border-2 bg-card p-6 space-y-4">
+              <h3 className="font-bold text-xl">Review Client Information</h3>
               
               <div className="grid gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Client Name</p>
-                  <p className="font-medium">{formData.name}</p>
+                  <p className="text-sm text-muted-foreground font-semibold">Client Name</p>
+                  <p className="font-semibold text-lg">{formData.name}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Mobile Number</p>
-                  <p className="font-medium">{formData.mobileNumber}</p>
+                  <p className="text-sm text-muted-foreground font-semibold">Mobile Number</p>
+                  <p className="font-semibold text-lg">{formData.mobileNumber}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground">Onboarding Status</p>
-                  <p className="font-medium">
+                  <p className="text-sm text-muted-foreground font-semibold">Onboarding Status</p>
+                  <p className="font-semibold text-lg">
                     {onboardingStatusOptions.find((o) => o.value === formData.onboardingState)?.label}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -359,15 +359,15 @@ export function OnboardClientPage() {
 
                 {formData.notes && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Notes</p>
+                    <p className="text-sm text-muted-foreground font-semibold">Notes</p>
                     <p className="font-medium whitespace-pre-wrap">{formData.notes}</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm">
+            <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+              <p className="text-sm font-medium">
                 <strong>Next steps:</strong> After creating this client, you can activate them to set a follow-up day and start their plan. 
                 {formData.onboardingState === OnboardingState.half && (
                   <span className="text-muted-foreground"> Note: This client will need to complete full onboarding before activation.</span>
@@ -383,6 +383,7 @@ export function OnboardClientPage() {
           variant="ghost"
           onClick={() => navigate('clients')}
           disabled={!canInteract}
+          className="font-semibold"
         >
           Cancel & Return to Clients
         </Button>

@@ -29,19 +29,25 @@ function App() {
   const isAuthenticated = !!identity;
 
   if (!isAuthenticated) {
-    return <LoginGate />;
+    return (
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <LoginGate />
+      </ThemeProvider>
+    );
   }
 
   // Show connecting state until backend is confirmed ready
   if (isConnecting || !connectionReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-lg font-medium text-foreground">Connecting...</p>
-          <p className="text-sm text-muted-foreground mt-2">Establishing connection to backend</p>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <div className="flex h-screen items-center justify-center bg-background">
+          <div className="text-center">
+            <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+            <p className="text-lg font-medium text-foreground">Connecting...</p>
+            <p className="text-sm text-muted-foreground mt-2">Establishing connection to backend</p>
+          </div>
         </div>
-      </div>
+      </ThemeProvider>
     );
   }
 
@@ -49,11 +55,15 @@ function App() {
   const showProfileSetup = !initLoading && initData && initData.userProfile === null;
 
   if (showProfileSetup) {
-    return <ProfileSetupDialog />;
+    return (
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ProfileSetupDialog />
+      </ThemeProvider>
+    );
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <AppLayout>
         {initLoading ? (
           <div className="flex h-[calc(100vh-8rem)] items-center justify-center">

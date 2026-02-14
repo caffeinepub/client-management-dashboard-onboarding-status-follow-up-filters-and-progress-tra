@@ -96,92 +96,92 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your fitness coaching business</p>
+        <h1>Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Overview of your fitness coaching business</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowTotalDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Total Clients</CardTitle>
+            <Users className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalClients}</div>
-            <p className="text-xs text-muted-foreground">Active memberships</p>
+            <div className="text-3xl font-bold">{metrics.totalClients}</div>
+            <p className="text-sm text-muted-foreground mt-1">Active memberships</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowActiveDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Active Clients</CardTitle>
+            <UserCheck className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.activeClients}</div>
-            <p className="text-xs text-muted-foreground">Currently training</p>
+            <div className="text-3xl font-bold">{metrics.activeClients}</div>
+            <p className="text-sm text-muted-foreground mt-1">Currently training</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowPausedDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Paused Clients</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Paused Clients</CardTitle>
+            <UserX className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.pausedClients}</div>
-            <p className="text-xs text-muted-foreground">Temporarily inactive</p>
+            <div className="text-3xl font-bold">{metrics.pausedClients}</div>
+            <p className="text-sm text-muted-foreground mt-1">Temporarily inactive</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowExpiringDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Expiring Soon</CardTitle>
+            <Clock className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.expiringClients}</div>
-            <p className="text-xs text-muted-foreground">Within 10 days</p>
+            <div className="text-3xl font-bold">{metrics.expiringClients}</div>
+            <p className="text-sm text-muted-foreground mt-1">Within 10 days</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowRenewalDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Renewal Opportunities</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Renewal Opportunities</CardTitle>
+            <TrendingUp className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.renewalOpportunities}</div>
-            <p className="text-xs text-muted-foreground">Expiring this month</p>
+            <div className="text-3xl font-bold">{metrics.renewalOpportunities}</div>
+            <p className="text-sm text-muted-foreground mt-1">Expiring this month</p>
           </CardContent>
         </Card>
 
         <Card 
-          className="cursor-pointer transition-colors hover:bg-accent"
+          className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
           onClick={() => setShowOnboardingDialog(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Onboarding</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Onboarding</CardTitle>
+            <Users className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.onboardingClients}</div>
-            <p className="text-xs text-muted-foreground">Pending activation</p>
+            <div className="text-3xl font-bold">{metrics.onboardingClients}</div>
+            <p className="text-sm text-muted-foreground mt-1">Pending activation</p>
           </CardContent>
         </Card>
       </div>

@@ -1,13 +1,13 @@
 {
-  "frontend/src/App.tsx": "Main application component with tightened onboarding guard that shows \"Connecting...\" state until backend readiness is confirmed via useStableActorConnection, preventing any route advancement or data loading until backend is 100% available.",
+  "frontend/src/App.tsx": "Main application component with ThemeProvider wrapping all views, tightened onboarding guard, and stable actor connection handling with proper theme support across all states.",
   "frontend/src/hooks/useRouter.ts": "Custom hash-based routing hook for navigation between pages with getClientCode() returning bigint | null for type safety with backend client code format.",
   "frontend/src/hooks/useQueries.ts": "React Query hooks gated on confirmed backend readiness with timing instrumentation for app init data fetch, using stable cache keys and enabled queries instead of unconditional refetching.",
-  "frontend/src/components/auth/LoginGate.tsx": "Login screen with Internet Identity authentication and feature highlights.",
+  "frontend/src/components/auth/LoginGate.tsx": "Login screen with bold gradient hero design, larger typography, enhanced button styling, and feature list with checkmark icons for improved visual hierarchy.",
   "frontend/src/components/auth/ProfileSetupDialog.tsx": "First-time user profile setup dialog that prompts for name after successful login.",
-  "frontend/src/components/layout/AppLayout.tsx": "Application layout wrapper with header navigation, user menu, logout handler that clears QueryClient cache, and footer with attribution.",
-  "frontend/src/pages/DashboardPage.tsx": "Dashboard page with all metric cards clickable, each opening a dedicated dialog with client tables, view actions, and export functionality with consistent headings and action placement.",
-  "frontend/src/pages/ClientsListPage.tsx": "Clients list page with consistent card layout using placeholders for missing optional fields (subscription end date shows \"—\" instead of hiding the row), consistent headings/empty states in English, and proper getFilterCount function prop passed to ClientsStatusFilterButton.",
-  "frontend/src/pages/OnboardClientPage.tsx": "Client onboarding page with wizard-style multi-step flow, inline field validation, mobile number normalization, copy client code action on success screen, and stable actor connection gating with consistent UI structure.",
+  "frontend/src/components/layout/AppLayout.tsx": "Application layout wrapper with enhanced header styling, theme toggle in user menu, improved navigation with bold typography, and refined footer with social links.",
+  "frontend/src/pages/DashboardPage.tsx": "Dashboard page with bold metric cards featuring uppercase labels, larger numbers, hover effects with scale and shadow, and improved spacing for visual hierarchy.",
+  "frontend/src/pages/ClientsListPage.tsx": "Clients list page with enhanced card styling (bold borders, hover effects), improved typography hierarchy, and refined empty states with better visual weight.",
+  "frontend/src/pages/OnboardClientPage.tsx": "Client onboarding page with wizard-style multi-step flow, enhanced card styling with bold borders, improved typography for headings and labels, and refined success screen.",
   "frontend/src/pages/ClientProfilePage.tsx": "Client profile page with consistent top-level structure (header, contact info, plan details with placeholders, and primary actions card) present for every client record, now wiring FollowUpSection with onMarkDone handler and FollowUpPromptDialog in manual mode for recording follow-up completion, passing client array to ExportClientsExcelDialog.",
   "frontend/src/components/clients/ClientStatusBadge.tsx": "Status badge component displaying paused/expired/expiring/active states or onboarding states (Half/Full) with distinct styling using string-based DisplayStatus type.",
   "frontend/src/components/progress/ProgressEntryForm.tsx": "Form for recording new progress entries with weight and body measurements.",
@@ -15,8 +15,8 @@
   "frontend/src/components/progress/ProgressCharts.tsx": "Line charts for visualizing weight and body measurements over time using Recharts.",
   "frontend/src/utils/status.ts": "Client status computation utilities with exported EXPIRING_WINDOW_DAYS constant and functions to determine display status, base status, and metrics for both ExtendedClient and ClientSummary types using subscription data from subscriptions array or subscriptionSummary.",
   "frontend/src/utils/format.ts": "Date and time formatting utilities for displaying timestamps from backend, including formatDateForExcel helper for Excel-compatible date strings.",
-  "frontend/src/index.css": "Global styles with warm orange-based OKLCH color system for light and dark modes.",
-  "frontend/tailwind.config.js": "Tailwind configuration with custom color tokens, Inter font family, and extended design system.",
+  "frontend/src/index.css": "Global styles with bold teal/cyan OKLCH color system for light and dark modes, including typography hierarchy (h1-h4) with consistent tracking and spacing.",
+  "frontend/tailwind.config.js": "Tailwind configuration with teal/cyan color tokens, Inter font family, card-hover shadow, and extended design system for the bold modern theme.",
   "frontend/src/utils/clientCode.ts": "Utilities for formatting client codes with zero-padding (#01, #02) and normalizing search queries to match codes with or without '#' prefix.",
   "frontend/src/utils/plan.ts": "Plan duration calculation utilities including computeTotalPlanDays for converting months + days to total days, and date computation helpers.",
   "frontend/src/components/clients/ActivateClientDialog.tsx": "Dialog component for activating a client that prompts for both plan start date and follow-up day with validation, Cancel/Confirm actions, and loading state support.",
@@ -53,5 +53,6 @@
   "frontend/src/hooks/useBackendReadiness.ts": "Polls backend isReady() endpoint with bounded exponential backoff using refs to prevent effect restarts, includes debug timing instrumentation, and ensures single polling loop per actor with robust cleanup.",
   "frontend/src/components/clients/ActionHint.tsx": "Reusable UI helper component that renders a disabled-state explanation with an icon and tooltip for actions that are visible but not currently applicable.",
   "frontend/src/components/clients/ConvertToFullOnboardingButton.tsx": "Clearly labeled action component for converting clients from half to full onboarding with loading state and disabled rendering with English explanation when conversion is not applicable.",
-  "frontend/src/components/clients/ClientPrimaryActionsCard.tsx": "Reusable Client Profile primary actions area that always renders the same action slots (Activate, Pause/Resume, Renew, Expire, Convert to Full Onboarding) with consistent enabled/disabled state and ActionHint text."
+  "frontend/src/components/clients/ClientPrimaryActionsCard.tsx": "Reusable Client Profile primary actions area that always renders the same action slots (Activate, Pause/Resume, Renew, Expire, Convert to Full Onboarding) with consistent enabled/disabled state and ActionHint text.",
+  "frontend/src/components/theme/ThemeToggleMenu.tsx": "Theme toggle menu items component providing Light/Dark/System theme options with checkmarks for the active theme using next-themes."
 }

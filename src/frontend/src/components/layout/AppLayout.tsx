@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LayoutDashboard, Users, UserPlus, LogOut, UserCircle2, TrendingUp } from 'lucide-react';
 import { SiX, SiFacebook, SiInstagram } from 'react-icons/si';
+import { ThemeToggleMenuItems } from '../theme/ThemeToggleMenu';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -38,20 +39,20 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+      <header className="border-b bg-card/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 lg:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-primary" />
+              <div className="h-11 w-11 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-md">
+                <TrendingUp className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Client Manager</h1>
-                <p className="text-xs text-muted-foreground">Fitness & Wellness</p>
+                <h1 className="text-xl font-bold tracking-tight">Client Manager</h1>
+                <p className="text-xs text-muted-foreground font-medium">Fitness & Wellness</p>
               </div>
             </div>
 
-            <nav className="hidden md:flex items-center gap-2">
+            <nav className="hidden md:flex items-center gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentRoute === item.route;
@@ -60,7 +61,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     key={item.route}
                     variant={isActive ? 'default' : 'ghost'}
                     onClick={() => navigate(item.route)}
-                    className="gap-2"
+                    className="gap-2 font-medium"
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
@@ -71,19 +72,21 @@ export function AppLayout({ children }: AppLayoutProps) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full">
+                <Button variant="outline" size="icon" className="rounded-full border-2">
                   <UserCircle2 className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{userProfile?.name || 'User'}</p>
+                    <p className="text-sm font-semibold">{userProfile?.name || 'User'}</p>
                     <p className="text-xs text-muted-foreground">Fitness Coach</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                <ThemeToggleMenuItems />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive font-medium">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>
@@ -101,7 +104,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   variant={isActive ? 'default' : 'ghost'}
                   onClick={() => navigate(item.route)}
                   size="sm"
-                  className="gap-2 whitespace-nowrap"
+                  className="gap-2 whitespace-nowrap font-medium"
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
@@ -112,10 +115,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8">{children}</main>
+      <main className="flex-1 container mx-auto px-4 lg:px-6 py-8">{children}</main>
 
-      <footer className="border-t bg-card/30 mt-auto">
-        <div className="container mx-auto px-4 py-6">
+      <footer className="border-t bg-card/50 mt-auto">
+        <div className="container mx-auto px-4 lg:px-6 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>© {new Date().getFullYear()} Client Manager</span>
@@ -127,7 +130,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium hover:text-foreground transition-colors"
+                className="font-semibold hover:text-foreground transition-colors"
               >
                 caffeine.ai
               </a>

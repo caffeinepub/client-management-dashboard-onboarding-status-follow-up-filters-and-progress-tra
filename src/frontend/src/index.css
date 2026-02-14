@@ -4,65 +4,117 @@
 
 @layer base {
     :root {
-        --radius: 0.75rem;
-        --background: 0.98 0 0;
-        --foreground: 0.15 0 0;
+        --radius: 0.5rem;
+        
+        /* Light mode - Bold teal/cyan palette */
+        --background: 0.98 0.005 200;
+        --foreground: 0.12 0.015 220;
         --card: 1 0 0;
-        --card-foreground: 0.15 0 0;
+        --card-foreground: 0.12 0.015 220;
         --popover: 1 0 0;
-        --popover-foreground: 0.15 0 0;
-        --primary: 0.45 0.15 35;
+        --popover-foreground: 0.12 0.015 220;
+        
+        /* Primary: Bold teal */
+        --primary: 0.55 0.18 195;
         --primary-foreground: 0.98 0 0;
-        --secondary: 0.96 0.01 85;
-        --secondary-foreground: 0.15 0 0;
-        --muted: 0.96 0.01 85;
-        --muted-foreground: 0.50 0.01 85;
-        --accent: 0.95 0.02 85;
-        --accent-foreground: 0.15 0 0;
-        --destructive: 0.55 0.22 25;
+        
+        /* Secondary: Deep slate */
+        --secondary: 0.92 0.01 240;
+        --secondary-foreground: 0.20 0.02 240;
+        
+        /* Muted: Light gray-blue */
+        --muted: 0.94 0.01 240;
+        --muted-foreground: 0.48 0.02 240;
+        
+        /* Accent: Vibrant cyan */
+        --accent: 0.88 0.08 200;
+        --accent-foreground: 0.15 0.02 220;
+        
+        /* Destructive: Bold red */
+        --destructive: 0.58 0.24 25;
         --destructive-foreground: 0.98 0 0;
-        --border: 0.90 0.01 85;
-        --input: 0.90 0.01 85;
-        --ring: 0.45 0.15 35;
-        --chart-1: 0.55 0.18 35;
-        --chart-2: 0.60 0.15 180;
-        --chart-3: 0.50 0.18 280;
-        --chart-4: 0.65 0.16 140;
-        --chart-5: 0.58 0.20 320;
+        
+        /* Borders & inputs */
+        --border: 0.88 0.01 240;
+        --input: 0.88 0.01 240;
+        --ring: 0.55 0.18 195;
+        
+        /* Chart colors - vibrant palette */
+        --chart-1: 0.60 0.20 195;
+        --chart-2: 0.62 0.22 280;
+        --chart-3: 0.58 0.20 140;
+        --chart-4: 0.64 0.18 35;
+        --chart-5: 0.56 0.22 320;
     }
 
     .dark {
-        --background: 0.12 0 0;
-        --foreground: 0.95 0 0;
-        --card: 0.16 0 0;
-        --card-foreground: 0.95 0 0;
-        --popover: 0.18 0 0;
-        --popover-foreground: 0.95 0 0;
-        --primary: 0.60 0.18 35;
-        --primary-foreground: 0.12 0 0;
-        --secondary: 0.22 0.01 85;
-        --secondary-foreground: 0.95 0 0;
-        --muted: 0.22 0.01 85;
-        --muted-foreground: 0.65 0.01 85;
-        --accent: 0.26 0.02 85;
-        --accent-foreground: 0.95 0 0;
-        --destructive: 0.60 0.22 25;
-        --destructive-foreground: 0.12 0 0;
-        --border: 0.25 0.01 85;
-        --input: 0.25 0.01 85;
-        --ring: 0.60 0.18 35;
-        --chart-1: 0.60 0.18 35;
-        --chart-2: 0.65 0.15 180;
-        --chart-3: 0.55 0.18 280;
-        --chart-4: 0.70 0.16 140;
-        --chart-5: 0.63 0.20 320;
+        /* Dark mode - Deep charcoal with bold accents */
+        --background: 0.10 0.01 240;
+        --foreground: 0.96 0.005 200;
+        --card: 0.14 0.015 240;
+        --card-foreground: 0.96 0.005 200;
+        --popover: 0.16 0.015 240;
+        --popover-foreground: 0.96 0.005 200;
+        
+        /* Primary: Bright teal */
+        --primary: 0.68 0.20 195;
+        --primary-foreground: 0.10 0.01 240;
+        
+        /* Secondary: Medium slate */
+        --secondary: 0.22 0.02 240;
+        --secondary-foreground: 0.92 0.01 200;
+        
+        /* Muted: Dark gray-blue */
+        --muted: 0.20 0.02 240;
+        --muted-foreground: 0.62 0.02 220;
+        
+        /* Accent: Electric cyan */
+        --accent: 0.28 0.08 200;
+        --accent-foreground: 0.96 0.005 200;
+        
+        /* Destructive: Bright red */
+        --destructive: 0.62 0.26 25;
+        --destructive-foreground: 0.10 0.01 240;
+        
+        /* Borders & inputs */
+        --border: 0.24 0.02 240;
+        --input: 0.24 0.02 240;
+        --ring: 0.68 0.20 195;
+        
+        /* Chart colors - vibrant dark palette */
+        --chart-1: 0.65 0.22 195;
+        --chart-2: 0.67 0.24 280;
+        --chart-3: 0.63 0.22 140;
+        --chart-4: 0.69 0.20 35;
+        --chart-5: 0.61 0.24 320;
     }
 
     * {
         @apply border-border;
     }
+    
     body {
         @apply bg-background text-foreground;
         font-feature-settings: "rlig" 1, "calt" 1;
+    }
+    
+    /* Typography hierarchy */
+    h1 {
+        @apply text-3xl font-bold tracking-tight;
+        letter-spacing: -0.02em;
+    }
+    
+    h2 {
+        @apply text-2xl font-bold tracking-tight;
+        letter-spacing: -0.015em;
+    }
+    
+    h3 {
+        @apply text-xl font-semibold tracking-tight;
+        letter-spacing: -0.01em;
+    }
+    
+    h4 {
+        @apply text-lg font-semibold;
     }
 }
