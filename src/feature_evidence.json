@@ -1,0 +1,47 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-in-the-client-profile-page-add-a-dedicated-follow-up-section-that-shows-current-follow-up-status-done-vs-not-done-with-clear-color-styling-green-for-done-red-for-not-done-and-a-follow-up-notes-table-column-showing-what-was-discussed-for-each-follow-up-entry",
+      "featureTitle": "In the client profile page, add a dedicated \"Follow-up\" section that shows current follow-up status (Done vs Not done) with clear color styling (green for done, red for not done) and a follow-up notes table/column showing what was discussed for each follow-up entry.",
+      "files": [
+        "frontend/src/components/clients/FollowUpSection.tsx",
+        "frontend/src/pages/ClientProfilePage.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-implement-an-automatic-follow-up-prompt-on-the-client-profile-page-that-pops-up-when-a-follow-up-is-due-asking-whether-the-follow-up-is-done-if-done-mark-it-done-and-save-notes-if-not-done-keep-the-status-red-not-done-and-allow-saving-notes-if-provided",
+      "featureTitle": "Implement an automatic follow-up prompt on the client profile page that pops up when a follow-up is due, asking whether the follow-up is done; if done, mark it done and save notes; if not done, keep the status red/not done and allow saving notes if provided.",
+      "files": [
+        "frontend/src/components/clients/FollowUpPromptDialog.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/ClientProfilePage.tsx",
+        "frontend/src/utils/followUp.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-3"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

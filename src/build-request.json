@@ -1,0 +1,83 @@
+{
+  "kind": "build_request",
+  "title": "Add follow-up prompt and follow-up notes tracking on Client Profile",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Extend the backend client data model to persist follow-up completion and follow-up notes history per client, and expose an API to record a follow-up outcome (done vs not done) with notes.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "In the profile of client add section for the followup which automatically pops up and ask whether followup is done if yes then marked done otherwise keep it red and not done along that add on followup notes column to add on what was discussed"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A client record includes a persisted follow-up history structure that stores at minimum: timestamp/date, done flag, and notes text.",
+        "A new shared (update) backend method exists to add/update the follow-up record for a given client (authorized users only).",
+        "The method traps with a clear error when the client code does not exist or the caller is not authorized.",
+        "Client fetch responses used by the frontend include the follow-up history fields (e.g., in the ExtendedClient type returned by list/get APIs).",
+        "If this schema change affects stable state, a conditional migration is added/updated so existing clients upgrade safely without data loss."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "In the client profile page, add a dedicated \"Follow-up\" section that shows current follow-up status (Done vs Not done) with clear color styling (green for done, red for not done) and a follow-up notes table/column showing what was discussed for each follow-up entry.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "add section for the followup...marked done otherwise keep it red and not done along that add on followup notes column to add on what was discussed"
+        ]
+      },
+      "acceptanceCriteria": [
+        "ClientProfilePage renders a new \"Follow-up\" card/section separate from existing Contact Information / Plan Details / Actions / Progress tabs.",
+        "The section displays a prominent status indicator that is red and labeled \"Not done\" when the latest relevant follow-up is not completed, and green and labeled \"Done\" when completed.",
+        "The section includes a history/table view that contains a visible \"Notes\" column showing saved follow-up discussion notes (empty notes render as \"—\" or similar).",
+        "The UI uses existing Tailwind/shadcn components and styling patterns already present in the app.",
+        "All user-facing text in this new section is in English."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Implement an automatic follow-up prompt on the client profile page that pops up when a follow-up is due, asking whether the follow-up is done; if done, mark it done and save notes; if not done, keep the status red/not done and allow saving notes if provided.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "followup which automatically pops up and ask whether followup is done if yes then marked done otherwise keep it red and not done"
+        ]
+      },
+      "acceptanceCriteria": [
+        "When opening a client profile, if the client has a follow-up day configured and the follow-up is due (per the app’s due logic), a modal/dialog automatically opens asking: \"Is the follow-up done?\" with actions \"Yes, mark as done\" and \"Not done\".",
+        "Submitting \"Yes, mark as done\" calls the backend API to record a follow-up entry with done=true, updates the UI to show green \"Done\", and the dialog closes.",
+        "Submitting \"Not done\" records/keeps done=false for the due follow-up entry, updates/keeps the UI red \"Not done\", and the dialog closes (or remains until explicitly closed, but state stays not done).",
+        "The prompt includes an English \"Follow-up notes\" text input/textarea to save what was discussed; saved notes appear in the Follow-up notes column/history after submission.",
+        "React Query cache for ['client', clientCode] and ['clients'] is invalidated/refetched as needed so the new follow-up status/notes are visible immediately after submission.",
+        "If no follow-up day is set for the client, the follow-up prompt does not appear."
+      ]
+    }
+  ],
+  "constraints": [
+    "Backend must remain a single Motoko actor in backend/main.mo; do not introduce additional backend services.",
+    "Do not edit frontend files under frontend/immutablePaths (e.g., frontend/src/hooks/useInternetIdentity.ts(x), frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui). Compose existing UI components instead.",
+    "Use Internet Identity-based authorization patterns already present (require user role for follow-up mutations).",
+    "Do not introduce external databases or third-party auth providers."
+  ],
+  "nonGoals": [
+    "Adding real-time notifications/reminders for follow-ups outside of the client profile page.",
+    "Building a global follow-up management workflow beyond the requested profile prompt and notes tracking.",
+    "Changing onboarding/activation/pause logic unrelated to follow-up tracking."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

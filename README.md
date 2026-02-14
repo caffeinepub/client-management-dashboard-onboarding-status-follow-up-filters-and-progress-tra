@@ -1,2 +1,3 @@
-# client-management-dashboard-onboarding-status-follow-up-filters-and-progress-tra
-Exported from Caffeine project: Add follow-up prompt and follow-up notes tracking on Client Profile
+## 
+
+To run app build and run docker image: `docker build -t app . docker run -it --network host app`
