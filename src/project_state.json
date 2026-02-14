@@ -1,24 +1,16 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Client profile enhancements: add follow-up section with status prompt and follow-up notes tracking.",
+  "summary": "New project",
   "architectural_notes": [],
   "known_issues": [],
   "isFixRequest": false,
   "existing_features": [
     {
-      "id": "feature-in-the-client-profile-page-add-a-dedicated-follow-up-section-that-shows-current-follow-up-status-done-vs-not-done-with-clear-color-styling-green-for-done-red-for-not-done-and-a-follow-up-notes-table-column-showing-what-was-discussed-for-each-follow-up-entry",
-      "title": "In the client profile page, add a dedicated \"Follow-up\" section that shows current follow-up status (Done vs Not done) with clear color styling (green for done, red for not done) and a follow-up notes table/column showing what was discussed for each follow-up entry.",
+      "id": "feature-add-a-manual-action-button-in-the-client-profile-page-s-follow-up-status-ui-that-lets-the-user-mark-the-follow-up-as-done-on-demand-without-waiting-for-the-automatic-due-date-popup",
+      "title": "Add a manual action button in the Client Profile page’s Follow-up Status UI that lets the user mark the follow-up as done on demand (without waiting for the automatic due-date popup).",
       "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-implement-an-automatic-follow-up-prompt-on-the-client-profile-page-that-pops-up-when-a-follow-up-is-due-asking-whether-the-follow-up-is-done-if-done-mark-it-done-and-save-notes-if-not-done-keep-the-status-red-not-done-and-allow-saving-notes-if-provided",
-      "title": "Implement an automatic follow-up prompt on the client profile page that pops up when a follow-up is due, asking whether the follow-up is done; if done, mark it done and save notes; if not done, keep the status red/not done and allow saving notes if provided.",
-      "reqIds": [
-        "REQ-3"
+        "REQ-1"
       ],
       "version": 1
     }
@@ -26,20 +18,12 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Add client profile follow-up section that prompts for completion status (done vs red/not done) and includes a follow-up notes field/column for discussion details",
+      "summary": "Add a button in the follow-up status UI to manually mark a follow-up as done",
       "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Extend the backend client data model to persist follow-up completion and follow-up notes history per client, and expose an API to record a follow-up outcome (done vs not done) with notes.",
-      "reqIds": [
-        "REQ-1"
-      ],
       "status": "pending"
     }
   ],
-  "projectName": "Add follow-up prompt and follow-up notes tracking on Client Profile",
+  "projectName": "Add manual 'Mark follow-up done' button in Follow-up Status",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

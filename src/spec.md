@@ -1,12 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Add follow-up status prompting and follow-up notes/history tracking to each client profile.
+**Goal:** Let users manually mark a client follow-up as done from the Client Profile’s Follow-up Status card.
 
 **Planned changes:**
-- Extend the backend client data model to persist per-client follow-up history entries (date/timestamp, done flag, notes) and include these fields in client fetch responses.
-- Add an authorized backend API method to record a follow-up outcome (done vs not done) with optional notes, with clear errors for missing client codes or unauthorized callers, and a safe migration for existing data.
-- Update the Client Profile page to include a new “Follow-up” section showing the latest follow-up status with clear color styling (green “Done”, red “Not done”) plus a history/table that includes a “Notes” column.
-- Add an automatic modal prompt on profile open when a follow-up is due (and the client has a follow-up day configured) to ask “Is the follow-up done?” and allow entering/saving follow-up notes; update UI immediately after submission via appropriate React Query invalidation/refetch.
+- Add a clear “Mark follow-up done” action button to the Follow-up Status UI on the Client Profile page (for activated clients with a configured follow-up day).
+- On click, trigger the existing follow-up recording flow to create a follow-up entry with status = done, then update the Follow-up Status UI to reflect Done.
+- Ensure the new “done” entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.
+- Add a disabled + loading state while the follow-up record mutation is in progress, and show a user-facing error toast on failure using existing error/toast patterns.
 
-**User-visible outcome:** When viewing a client profile, users see a Follow-up section with current status and a notes/history table; if a follow-up is due, an automatic prompt appears to mark it done or not done and save notes, and the status/notes update right away.
+**User-visible outcome:** From a client’s profile, the user can click a button to immediately mark the follow-up as done and see the status and history update right away.

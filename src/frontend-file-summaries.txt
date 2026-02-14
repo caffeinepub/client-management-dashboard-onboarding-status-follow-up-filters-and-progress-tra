@@ -8,7 +8,7 @@
   "frontend/src/pages/DashboardPage.tsx": "Dashboard with metrics cards, follow-up day selector showing only activated and active (non-paused) clients, and updated description clarifying the active-only filter.",
   "frontend/src/pages/ClientsListPage.tsx": "Clients list with search, filters (Active shows only activated non-paused clients, Paused shows all paused clients regardless of activation, Half/Full show non-activated onboarded clients), and proper fallback display for non-activated clients showing \"Not activated yet\" instead of end date.",
   "frontend/src/pages/OnboardClientPage.tsx": "Client onboarding form that collects name, mobile, onboarding state, plan duration, and notes; follow-up day selection removed and now shows a note that activation is required to set follow-up day.",
-  "frontend/src/pages/ClientProfilePage.tsx": "Client profile page with contact info, plan details, pause/resume toggle, onboarding state switcher, activation button, progress tracking tabs, pause history section, new follow-up section, and automatic follow-up prompt dialog that appears when due.",
+  "frontend/src/pages/ClientProfilePage.tsx": "Client profile page with contact info, plan details, pause/resume toggle, onboarding state switcher, activation button, progress tracking tabs, pause history section, follow-up section with manual mark-done action, and automatic follow-up prompt dialog that appears when due.",
   "frontend/src/components/clients/ClientStatusBadge.tsx": "Status badge component displaying paused/expired/expiring/active states or onboarding states (Half/Full) with distinct styling.",
   "frontend/src/components/progress/ProgressEntryForm.tsx": "Form for recording new progress entries with weight and body measurements.",
   "frontend/src/components/progress/ProgressHistoryTable.tsx": "Table displaying historical progress entries with trend indicators.",
@@ -23,6 +23,6 @@
   "frontend/src/utils/errors.ts": "Error normalization utility that converts backend trap messages and errors into user-friendly English messages for display in toasts.",
   "frontend/src/components/clients/PauseClientDialog.tsx": "Dialog component for pausing a client that collects required pause duration (days) and reason with validation, Cancel/Confirm actions, and loading state support.",
   "frontend/src/utils/followUp.ts": "Utility functions for determining follow-up due status, checking if today matches the configured follow-up day, and retrieving the latest follow-up entry with status.",
-  "frontend/src/components/clients/FollowUpSection.tsx": "Card component displaying follow-up status (Done/Not done) with color-coded indicator and a history table showing date, day, status, and notes for all follow-up entries.",
+  "frontend/src/components/clients/FollowUpSection.tsx": "Card component displaying follow-up status with a manual \"Mark as Done\" button, color-coded status indicator, and a history table showing date, day, status, and notes for all follow-up entries.",
   "frontend/src/components/clients/FollowUpPromptDialog.tsx": "Dialog component that automatically prompts users to record follow-up completion with \"Yes, mark as done\" and \"Not done\" actions plus a notes textarea."
 }

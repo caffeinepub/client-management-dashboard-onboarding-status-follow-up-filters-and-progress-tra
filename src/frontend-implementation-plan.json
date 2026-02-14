@@ -1,62 +1,28 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Client Profile follow-up status, notes history, and due prompt",
+  "title": "Manual 'Mark follow-up done' action on Client Profile follow-up status",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Add a Follow-up section to the client profile showing latest status (Done/Not done) with color styling and a follow-up notes history table.",
+      "id": "REQ-1",
+      "summary": "Add a manual action button in the Follow-up Status UI to record a 'done' follow-up immediately using the existing follow-up recording flow, with loading/disabled states and error toasts.",
       "acceptanceCriteria": [
-        "ClientProfilePage renders a new \"Follow-up\" card/section separate from existing Contact Information / Plan Details / Actions / Progress tabs.",
-        "The section displays a prominent status indicator that is red and labeled \"Not done\" when the latest relevant follow-up is not completed, and green and labeled \"Done\" when completed.",
-        "The section includes a history/table view that contains a visible \"Notes\" column showing saved follow-up discussion notes (empty notes render as \"—\" or similar).",
-        "The UI uses existing Tailwind/shadcn components and styling patterns already present in the app.",
-        "All user-facing text in this new section is in English."
+        "When viewing an activated client with a configured follow-up day, the Follow-up Status card shows a clear action button to manually mark the follow-up as done.",
+        "Clicking the button records a follow-up entry with status = done for that client (using the existing follow-up recording flow), and the UI updates to show the status as Done.",
+        "After marking as done, the new entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.",
+        "The button is disabled and shows a loading state while the follow-up record mutation is in progress.",
+        "If recording fails, show a user-facing error toast using the app’s existing error normalization/toast patterns."
       ],
       "file_operations": [
         {
           "path": "frontend/src/components/clients/FollowUpSection.tsx",
-          "operation": "create",
-          "description": "Create a reusable Follow-up section component that uses existing shadcn/ui primitives (e.g., Card) and Tailwind styling to render (1) a green/red Done vs Not done status indicator based on the latest follow-up entry and (2) a history list/table with at minimum Date/Time, Done, and Notes columns (render empty notes as \"—\"). Verify the component's usage instructions before implementing."
+          "operation": "modify",
+          "description": "Extend the Follow-up Status card UI to include a prominent manual action button (e.g., 'Mark follow-up done') and support props for triggering the action and reflecting loading/disabled state; keep the existing status indicator and history table behavior intact so the newest entry remains sorted to the top after data refresh."
         },
         {
           "path": "frontend/src/pages/ClientProfilePage.tsx",
           "operation": "modify",
-          "description": "Wire the new FollowUpSection into the ClientProfilePage layout as a dedicated section/card separate from Contact Information / Plan Details / Actions / Progress tabs, passing client.followUpHistory and rendering the current status + notes history."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Implement an automatic follow-up due prompt dialog on client profile that records Done/Not done outcomes with notes and refreshes client data immediately.",
-      "acceptanceCriteria": [
-        "When opening a client profile, if the client has a follow-up day configured and the follow-up is due (per the app’s due logic), a modal/dialog automatically opens asking: \"Is the follow-up done?\" with actions \"Yes, mark as done\" and \"Not done\".",
-        "Submitting \"Yes, mark as done\" calls the backend API to record a follow-up entry with done=true, updates the UI to show green \"Done\", and the dialog closes.",
-        "Submitting \"Not done\" records/keeps done=false for the due follow-up entry, updates/keeps the UI red \"Not done\", and the dialog closes (or remains until explicitly closed, but state stays not done).",
-        "The prompt includes an English \"Follow-up notes\" text input/textarea to save what was discussed; saved notes appear in the Follow-up notes column/history after submission.",
-        "React Query cache for ['client', clientCode] and ['clients'] is invalidated/refetched as needed so the new follow-up status/notes are visible immediately after submission.",
-        "If no follow-up day is set for the client, the follow-up prompt does not appear."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/utils/followUp.ts",
-          "operation": "create",
-          "description": "Add frontend due-logic helpers to determine whether a follow-up is due for a client based on the configured followUpDay and existing followUpHistory (e.g., due when today matches followUpDay and there is no entry recorded for the current day). Include a small helper for deriving the latest relevant follow-up entry to drive the status indicator."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Add a React Query mutation hook (e.g., useRecordFollowUp) that calls the backend capability to record a follow-up outcome with notes, and on success invalidates/refetches ['client', clientCode] and ['clients'] so the updated follow-up status/notes appear immediately."
-        },
-        {
-          "path": "frontend/src/components/clients/FollowUpPromptDialog.tsx",
-          "operation": "create",
-          "description": "Create a shadcn/ui Dialog-based component that asks \"Is the follow-up done?\" and includes a \"Follow-up notes\" textarea plus actions \"Yes, mark as done\" and \"Not done\"; on submit, call the follow-up mutation and handle loading/error states using existing patterns (e.g., normalizeError + toast). Verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/pages/ClientProfilePage.tsx",
-          "operation": "modify",
-          "description": "Implement automatic prompt behavior: when the client loads, if followUpDay is set and due per utils/followUp.ts, auto-open FollowUpPromptDialog; on successful submission, close dialog and rely on query invalidation to update the Follow-up section UI. Ensure the dialog does not appear when followUpDay is not set."
+          "description": "Wire the manual 'Mark follow-up done' button into the Client Profile page by adding a handler that calls the existing useRecordFollowUp mutation with done=true (and appropriate follow-up day), disables/shows loading while the mutation is pending, closes any open due prompt if applicable, and shows error toasts using normalizeError(...) and the existing toast pattern on failure."
         }
       ]
     }

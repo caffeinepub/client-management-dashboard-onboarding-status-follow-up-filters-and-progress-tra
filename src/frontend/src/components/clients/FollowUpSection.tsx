@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Calendar } from 'lucide-react';
 import { ExtendedClient } from '../../backend';
 import { getFollowUpStatus } from '../../utils/followUp';
@@ -7,9 +8,11 @@ import { formatDateTime } from '../../utils/format';
 
 interface FollowUpSectionProps {
   client: ExtendedClient;
+  onMarkDone?: () => void;
+  isMarkingDone?: boolean;
 }
 
-export function FollowUpSection({ client }: FollowUpSectionProps) {
+export function FollowUpSection({ client, onMarkDone, isMarkingDone = false }: FollowUpSectionProps) {
   const { isDone, latestEntry } = getFollowUpStatus(client);
 
   return (
@@ -22,24 +25,46 @@ export function FollowUpSection({ client }: FollowUpSectionProps) {
         <CardDescription>Track follow-up completion and notes</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Status Indicator */}
-        <div className="flex items-center gap-3 p-4 rounded-lg border bg-card">
-          {isDone ? (
-            <>
-              <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-              <div>
-                <p className="font-semibold text-green-600 dark:text-green-400">Done</p>
-                <p className="text-sm text-muted-foreground">Latest follow-up completed</p>
-              </div>
-            </>
-          ) : (
-            <>
-              <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-              <div>
-                <p className="font-semibold text-red-600 dark:text-red-400">Not done</p>
-                <p className="text-sm text-muted-foreground">Follow-up pending</p>
-              </div>
-            </>
+        {/* Status Indicator with Manual Action Button */}
+        <div className="flex items-center justify-between gap-3 p-4 rounded-lg border bg-card">
+          <div className="flex items-center gap-3">
+            {isDone ? (
+              <>
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <div>
+                  <p className="font-semibold text-green-600 dark:text-green-400">Done</p>
+                  <p className="text-sm text-muted-foreground">Latest follow-up completed</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                <div>
+                  <p className="font-semibold text-red-600 dark:text-red-400">Not done</p>
+                  <p className="text-sm text-muted-foreground">Follow-up pending</p>
+                </div>
+              </>
+            )}
+          </div>
+          {onMarkDone && (
+            <Button
+              onClick={onMarkDone}
+              disabled={isMarkingDone}
+              size="sm"
+              className="shrink-0"
+            >
+              {isMarkingDone ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Marking...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Mark as Done
+                </>
+              )}
+            </Button>
           )}
         </div>
 

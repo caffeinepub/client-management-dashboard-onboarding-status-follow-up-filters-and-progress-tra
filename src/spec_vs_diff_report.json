@@ -1,54 +1,50 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T19:42:20.191Z",
-  "summary": "Diff adds frontend Follow-up section + due prompt dialog, follow-up due logic utilities, and a backend schema/migration for follow-up history. However, the backend authorized update API to record follow-up outcomes is not clearly evidenced in the provided diff summary, and several unrelated frontend behavior changes appear to have been introduced (filters/onboarding UI changes).",
+  "generatedAt": "2026-02-14T19:50:11.892Z",
+  "summary": "Diff adds a manual \"Mark as Done\" button UI to the Follow-up Status card with a disabled/loading state, but the diff excerpts do not provide enough evidence that the button is only shown for activated clients with a configured follow-up day, that clicking it actually records a done follow-up via the existing flow and updates the UI/history, or that failures surface a normalized error toast.",
   "missing_requirements": [
     {
       "id": "REQ-1",
-      "requirement": "Add a new shared (update) backend method to add/update the follow-up record for a given client (authorized users only), trapping clearly when the client code does not exist or caller is not authorized, and ensure client fetch APIs include follow-up history fields.",
-      "reason": "While the data model and migration add `followUpHistory`, the diff summary does not show any new backend shared update method implementation (nor its authorization/trap behavior) or confirm list/get APIs return the new fields. The provided `backend/main.mo` snippet is truncated before method definitions.",
+      "requirement": "When viewing an activated client with a configured follow-up day, the Follow-up Status card shows a clear action button to manually mark the follow-up as done.",
+      "reason": "FollowUpSection renders the button whenever an onMarkDone prop is provided, but the provided diff snippet does not show the parent logic that only supplies onMarkDone for activated clients with a configured follow-up day.",
       "evidence": [
-        "backend/main.mo (truncated; shows new FollowUpEntry/Client.followUpHistory types but no record-follow-up method or traps/authorization for it)",
-        "backend/migration.mo (adds followUpHistory=[] during migration, but does not expose an API)"
-      ]
-    }
-  ],
-  "hallucinated_features": [
-    {
-      "description": "Removed follow-up day selection from the onboarding flow and added messaging that activation is required to set follow-up day.",
-      "reason": "Not requested by REQ-1/2/3; changes onboarding UI/logic, which is explicitly listed as a non-goal unless directly necessary for follow-up tracking.",
-      "evidence": [
-        "frontend/src/pages/OnboardClientPage.tsx (truncated)",
-        "frontend-file-summaries.txt (\"follow-up day selection removed\")"
+        "frontend/src/components/clients/FollowUpSection.tsx (button gated only by `onMarkDone`)",
+        "frontend/src/pages/ClientProfilePage.tsx (truncated; parent gating logic not visible)"
       ]
     },
     {
-      "description": "Changed client fetching logic to combine/deduplicate results across getAllClients and onboarding-state filters (half/full) for both list and single-client queries.",
-      "reason": "Not requested by REQ-1/2/3; appears to be broader data-loading behavior changes beyond follow-up prompt/notes tracking.",
+      "id": "REQ-1",
+      "requirement": "Clicking the button records a follow-up entry with status = done for that client using the existing follow-up recording flow, and the UI updates to show the status as Done.",
+      "reason": "ClientProfilePage imports useRecordFollowUp, toast, and normalizeError, but the actual onClick handler implementation (calling the mutation and updating UI state/cache) is not visible in the truncated excerpt.",
       "evidence": [
-        "frontend/src/hooks/useQueries.ts (truncated; combines getAllClients + filterClientsByOnboardingState and deduplicates)"
+        "frontend/src/pages/ClientProfilePage.tsx (truncated; imports `useRecordFollowUp`, `toast`, `normalizeError` but handler not shown)"
       ]
     },
     {
-      "description": "Adjusted Dashboard and Clients List filtering/labels (e.g., active-only activated clients, paused behavior, \"Not activated yet\" fallback).",
-      "reason": "Not requested by REQ-1/2/3; these are broader workflow/UI changes outside the requested client profile follow-up prompt + notes tracking.",
+      "id": "REQ-1",
+      "requirement": "After marking as done, the new entry appears at the top of the Follow-up History table with the current timestamp and correct follow-up day.",
+      "reason": "FollowUpSection sorts history by timestamp descending (which would display a newly added entry at the top), but the diff excerpt does not show that a new entry is actually appended/returned from the existing record flow with correct timestamp and follow-up day.",
       "evidence": [
-        "frontend-file-summaries.txt (DashboardPage and ClientsListPage descriptions)"
+        "frontend/src/components/clients/FollowUpSection.tsx (history is sorted by timestamp desc)",
+        "frontend/src/pages/ClientProfilePage.tsx (truncated; mutation success/update not shown)"
+      ]
+    },
+    {
+      "id": "REQ-1",
+      "requirement": "If recording fails, show a user-facing error toast using the app’s existing error normalization/toast patterns.",
+      "reason": "Although toast and normalizeError are imported in ClientProfilePage, the diff excerpt is truncated before any error handling for the manual mark-done action is shown.",
+      "evidence": [
+        "frontend/src/pages/ClientProfilePage.tsx (truncated; imports `normalizeError` and `toast` but error handling not shown)"
       ]
     }
   ],
-  "confidence": 0.62,
+  "hallucinated_features": [],
+  "confidence": 0.56,
   "changed_files": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/components/clients/FollowUpPromptDialog.tsx",
     "frontend/src/components/clients/FollowUpSection.tsx",
-    "frontend/src/hooks/useQueries.ts",
     "frontend/src/pages/ClientProfilePage.tsx",
-    "frontend/src/pages/OnboardClientPage.tsx",
-    "frontend/src/utils/followUp.ts",
     "project_state.json"
   ]
 }

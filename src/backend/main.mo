@@ -11,10 +11,10 @@ import Iter "mo:core/Iter";
 
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
-import Migration "migration";
+
 
 // Must use with-clause, never call migration.run directly
-(with migration = Migration.run)
+
 actor {
   // Authorization system using prefabricated component modules
   let accessControlState = AccessControl.initState();

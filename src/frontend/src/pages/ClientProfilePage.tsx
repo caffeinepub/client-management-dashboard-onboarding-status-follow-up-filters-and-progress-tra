@@ -144,6 +144,25 @@ export function ClientProfilePage() {
     }
   };
 
+  const handleManualMarkDone = async () => {
+    if (!client.followUpDay) return;
+
+    try {
+      await recordFollowUp.mutateAsync({
+        clientCode: client.code,
+        followUpDay: client.followUpDay,
+        done: true,
+        notes: '',
+      });
+      toast.success('Follow-up marked as done');
+      // Close the automatic prompt if it's open
+      setShowFollowUpPrompt(false);
+    } catch (error) {
+      toast.error(normalizeError(error));
+      console.error('Manual mark done error:', error);
+    }
+  };
+
   const followUpDayLabel = client.followUpDay 
     ? client.followUpDay.charAt(0).toUpperCase() + client.followUpDay.slice(1)
     : 'Not set';
@@ -217,7 +236,11 @@ export function ClientProfilePage() {
 
       {/* Follow-up Section */}
       {isActivated && client.followUpDay && (
-        <FollowUpSection client={client} />
+        <FollowUpSection 
+          client={client} 
+          onMarkDone={handleManualMarkDone}
+          isMarkingDone={recordFollowUp.isPending}
+        />
       )}
 
       {client.pauseEntries && client.pauseEntries.length > 0 && (
@@ -340,29 +363,11 @@ export function ClientProfilePage() {
         </TabsContent>
 
         <TabsContent value="history">
-          {progressLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center space-y-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-                <p className="text-sm text-muted-foreground">Loading progress history...</p>
-              </div>
-            </div>
-          ) : (
-            <ProgressHistoryTable progress={progress || []} />
-          )}
+          <ProgressHistoryTable progress={progress || []} />
         </TabsContent>
 
         <TabsContent value="charts">
-          {progressLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center space-y-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-                <p className="text-sm text-muted-foreground">Loading charts...</p>
-              </div>
-            </div>
-          ) : (
-            <ProgressCharts progress={progress || []} />
-          )}
+          <ProgressCharts progress={progress || []} />
         </TabsContent>
       </Tabs>
 
