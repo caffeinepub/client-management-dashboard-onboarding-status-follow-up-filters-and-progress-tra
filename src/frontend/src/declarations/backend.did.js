@@ -35,6 +35,10 @@ export const PauseEntry = IDL.Record({
   'timestamp' : Time,
   'reason' : IDL.Text,
 });
+export const PlanDetails = IDL.Record({
+  'extraDays' : IDL.Nat,
+  'planDurationDays' : IDL.Nat,
+});
 export const FollowUpDay = IDL.Variant({
   'tuesday' : IDL.Null,
   'wednesday' : IDL.Null,
@@ -69,6 +73,7 @@ export const ExtendedClient = IDL.Record({
   'pauseTime' : IDL.Opt(Time),
   'totalPausedDuration' : IDL.Int,
   'mobileNumber' : IDL.Text,
+  'initialPlanDetails' : IDL.Opt(PlanDetails),
   'followUpHistory' : IDL.Vec(FollowUpEntry),
   'progress' : IDL.Vec(ClientProgress),
   'notes' : IDL.Text,
@@ -116,7 +121,7 @@ export const idlService = IDL.Service({
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'convertToFullOnboarding' : IDL.Func([IDL.Nat], [], []),
   'createClient' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
+      [IDL.Text, IDL.Text, IDL.Text, OnboardingState, IDL.Nat, IDL.Nat],
       [IDL.Nat],
       [],
     ),
@@ -231,6 +236,10 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : Time,
     'reason' : IDL.Text,
   });
+  const PlanDetails = IDL.Record({
+    'extraDays' : IDL.Nat,
+    'planDurationDays' : IDL.Nat,
+  });
   const FollowUpDay = IDL.Variant({
     'tuesday' : IDL.Null,
     'wednesday' : IDL.Null,
@@ -265,6 +274,7 @@ export const idlFactory = ({ IDL }) => {
     'pauseTime' : IDL.Opt(Time),
     'totalPausedDuration' : IDL.Int,
     'mobileNumber' : IDL.Text,
+    'initialPlanDetails' : IDL.Opt(PlanDetails),
     'followUpHistory' : IDL.Vec(FollowUpEntry),
     'progress' : IDL.Vec(ClientProgress),
     'notes' : IDL.Text,
@@ -312,7 +322,7 @@ export const idlFactory = ({ IDL }) => {
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'convertToFullOnboarding' : IDL.Func([IDL.Nat], [], []),
     'createClient' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Text, OnboardingState],
+        [IDL.Text, IDL.Text, IDL.Text, OnboardingState, IDL.Nat, IDL.Nat],
         [IDL.Nat],
         [],
       ),

@@ -1,92 +1,87 @@
 import { useMemo, useState } from 'react';
-import { useGetClientSummaries, useGetExpiringClients } from '../hooks/useQueries';
+import { useGetAllClientSummaries, useGetExpiringClients } from '../hooks/useQueries';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, UserCheck, UserX, Clock, TrendingUp } from 'lucide-react';
 import { getClientStatus } from '../utils/status';
 import { getRenewalOpportunitiesThisMonth } from '../utils/renewalOpportunities';
-import { RenewalOpportunitiesThisMonthDialog } from '../components/dashboard/RenewalOpportunitiesThisMonthDialog';
 import { TotalClientsDialog } from '../components/dashboard/TotalClientsDialog';
 import { ActiveClientsDialog } from '../components/dashboard/ActiveClientsDialog';
 import { PausedClientsDialog } from '../components/dashboard/PausedClientsDialog';
 import { ExpiringSoonClientsDialog } from '../components/dashboard/ExpiringSoonClientsDialog';
 import { OnboardingClientsDialog } from '../components/dashboard/OnboardingClientsDialog';
+import { RenewalOpportunitiesThisMonthDialog } from '../components/dashboard/RenewalOpportunitiesThisMonthDialog';
 
 export function DashboardPage() {
-  const { data: summaries, isLoading } = useGetClientSummaries();
+  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
   const { data: expiringClients } = useGetExpiringClients();
-  
-  const [showTotalDialog, setShowTotalDialog] = useState(false);
-  const [showActiveDialog, setShowActiveDialog] = useState(false);
-  const [showPausedDialog, setShowPausedDialog] = useState(false);
-  const [showExpiringDialog, setShowExpiringDialog] = useState(false);
-  const [showRenewalDialog, setShowRenewalDialog] = useState(false);
-  const [showOnboardingDialog, setShowOnboardingDialog] = useState(false);
+
+  const [totalDialogOpen, setTotalDialogOpen] = useState(false);
+  const [activeDialogOpen, setActiveDialogOpen] = useState(false);
+  const [pausedDialogOpen, setPausedDialogOpen] = useState(false);
+  const [expiringDialogOpen, setExpiringDialogOpen] = useState(false);
+  const [onboardingDialogOpen, setOnboardingDialogOpen] = useState(false);
+  const [renewalDialogOpen, setRenewalDialogOpen] = useState(false);
 
   const metrics = useMemo(() => {
-    if (!summaries) {
+    if (!allSummaries) {
       return {
-        totalClients: 0,
-        activeClients: 0,
-        pausedClients: 0,
-        expiringClients: 0,
-        onboardingClients: 0,
+        total: 0,
+        active: 0,
+        paused: 0,
+        expiring: 0,
+        halfOnboarded: 0,
+        fullOnboarded: 0,
         renewalOpportunities: 0,
+        activatedClients: [],
+        halfOnboardedClients: [],
+        fullOnboardedClients: [],
+        pausedClients: [],
+        renewalOpportunitiesClients: [],
       };
     }
 
-    const allActivated = summaries.activated;
-    const activeClients = allActivated.filter(c => getClientStatus(c) === 'active').length;
-    const pausedClients = allActivated.filter(c => c.status === 'paused').length;
-    const onboardingClients = summaries.half.length + summaries.full.length;
-    
-    // Calculate renewal opportunities (clients expiring this month)
-    const renewalOpportunities = getRenewalOpportunitiesThisMonth(allActivated).length;
+    const activated = allSummaries.filter((c) => c.activatedAt !== undefined);
+    const halfOnboarded = allSummaries.filter(
+      (c) => c.onboardingState === 'half' && c.activatedAt === undefined
+    );
+    const fullOnboarded = allSummaries.filter(
+      (c) => c.onboardingState === 'full' && c.activatedAt === undefined
+    );
+
+    const active = activated.filter((c) => {
+      const status = getClientStatus(c);
+      return status !== 'paused' && status !== 'expired';
+    });
+
+    const paused = activated.filter((c) => getClientStatus(c) === 'paused');
+
+    const renewalOpportunitiesClients = getRenewalOpportunitiesThisMonth(activated);
 
     return {
-      totalClients: allActivated.length,
-      activeClients,
-      pausedClients,
-      expiringClients: expiringClients?.length || 0,
-      onboardingClients,
-      renewalOpportunities,
+      total: allSummaries.length,
+      active: active.length,
+      paused: paused.length,
+      expiring: expiringClients?.length || 0,
+      halfOnboarded: halfOnboarded.length,
+      fullOnboarded: fullOnboarded.length,
+      renewalOpportunities: renewalOpportunitiesClients.length,
+      activatedClients: activated,
+      halfOnboardedClients: halfOnboarded,
+      fullOnboardedClients: fullOnboarded,
+      pausedClients: paused,
+      renewalOpportunitiesClients,
     };
-  }, [summaries, expiringClients]);
-
-  // Derive client lists for each dialog
-  const totalClientsList = useMemo(() => {
-    if (!summaries) return [];
-    return summaries.activated;
-  }, [summaries]);
-
-  const activeClientsList = useMemo(() => {
-    if (!summaries) return [];
-    return summaries.activated.filter(c => getClientStatus(c) === 'active');
-  }, [summaries]);
-
-  const pausedClientsList = useMemo(() => {
-    if (!summaries) return [];
-    return summaries.activated.filter(c => c.status === 'paused');
-  }, [summaries]);
-
-  const expiringClientsList = useMemo(() => {
-    return expiringClients || [];
-  }, [expiringClients]);
-
-  const renewalOpportunitiesClients = useMemo(() => {
-    if (!summaries) return [];
-    return getRenewalOpportunitiesThisMonth(summaries.activated);
-  }, [summaries]);
+  }, [allSummaries, expiringClients]);
 
   const onboardingClientsList = useMemo(() => {
-    if (!summaries) return [];
-    return [...summaries.half, ...summaries.full];
-  }, [summaries]);
+    return [...metrics.halfOnboardedClients, ...metrics.fullOnboardedClients];
+  }, [metrics.halfOnboardedClients, metrics.fullOnboardedClients]);
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+      <div className="flex justify-center items-center py-12">
+        <div className="text-center space-y-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
           <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
@@ -101,130 +96,167 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card 
+        {/* Total Clients */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowTotalDialog(true)}
+          onClick={() => setTotalDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Total Clients</CardTitle>
-            <Users className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Total Clients
+            </CardTitle>
+            <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.totalClients}</div>
-            <p className="text-sm text-muted-foreground mt-1">Active memberships</p>
+            <div className="text-4xl font-bold">{metrics.total}</div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              All clients in your system
+            </p>
           </CardContent>
         </Card>
 
-        <Card 
+        {/* Active Clients */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowActiveDialog(true)}
+          onClick={() => setActiveDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Active Clients</CardTitle>
-            <UserCheck className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Active Clients
+            </CardTitle>
+            <UserCheck className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.activeClients}</div>
-            <p className="text-sm text-muted-foreground mt-1">Currently training</p>
+            <div className="text-4xl font-bold">{metrics.active}</div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              Currently active subscriptions
+            </p>
           </CardContent>
         </Card>
 
-        <Card 
+        {/* Paused Clients */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowPausedDialog(true)}
+          onClick={() => setPausedDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Paused Clients</CardTitle>
-            <UserX className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Paused Clients
+            </CardTitle>
+            <UserX className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.pausedClients}</div>
-            <p className="text-sm text-muted-foreground mt-1">Temporarily inactive</p>
+            <div className="text-4xl font-bold">{metrics.paused}</div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              Temporarily paused subscriptions
+            </p>
           </CardContent>
         </Card>
 
-        <Card 
+        {/* Expiring Soon */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowExpiringDialog(true)}
+          onClick={() => setExpiringDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Expiring Soon</CardTitle>
-            <Clock className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Expiring Soon
+            </CardTitle>
+            <Clock className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.expiringClients}</div>
-            <p className="text-sm text-muted-foreground mt-1">Within 10 days</p>
+            <div className="text-4xl font-bold">{metrics.expiring}</div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              Plans ending in next 10 days
+            </p>
           </CardContent>
         </Card>
 
-        <Card 
+        {/* Onboarding */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowRenewalDialog(true)}
+          onClick={() => setOnboardingDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Renewal Opportunities</CardTitle>
-            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Onboarding
+            </CardTitle>
+            <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.renewalOpportunities}</div>
-            <p className="text-sm text-muted-foreground mt-1">Expiring this month</p>
+            <div className="text-4xl font-bold">
+              {metrics.halfOnboarded + metrics.fullOnboarded}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              {metrics.halfOnboarded} half, {metrics.fullOnboarded} full
+            </p>
           </CardContent>
         </Card>
 
-        <Card 
+        {/* Renewal Opportunities */}
+        <Card
           className="cursor-pointer transition-all hover:shadow-card-hover hover:scale-[1.02] border-2"
-          onClick={() => setShowOnboardingDialog(true)}
+          onClick={() => setRenewalDialogOpen(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Onboarding</CardTitle>
-            <Users className="h-5 w-5 text-primary" />
+            <CardTitle className="text-sm font-bold uppercase tracking-wider">
+              Renewals This Month
+            </CardTitle>
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.onboardingClients}</div>
-            <p className="text-sm text-muted-foreground mt-1">Pending activation</p>
+            <div className="text-4xl font-bold">{metrics.renewalOpportunities}</div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              Plans expiring this month
+            </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Dialogs */}
       <TotalClientsDialog
-        open={showTotalDialog}
-        onOpenChange={setShowTotalDialog}
-        clients={totalClientsList}
+        open={totalDialogOpen}
+        onOpenChange={setTotalDialogOpen}
+        clients={metrics.activatedClients}
         isLoading={isLoading}
       />
 
       <ActiveClientsDialog
-        open={showActiveDialog}
-        onOpenChange={setShowActiveDialog}
-        clients={activeClientsList}
+        open={activeDialogOpen}
+        onOpenChange={setActiveDialogOpen}
+        clients={metrics.activatedClients.filter((c) => {
+          const status = getClientStatus(c);
+          return status !== 'paused' && status !== 'expired';
+        })}
         isLoading={isLoading}
       />
 
       <PausedClientsDialog
-        open={showPausedDialog}
-        onOpenChange={setShowPausedDialog}
-        clients={pausedClientsList}
+        open={pausedDialogOpen}
+        onOpenChange={setPausedDialogOpen}
+        clients={metrics.pausedClients}
         isLoading={isLoading}
       />
 
       <ExpiringSoonClientsDialog
-        open={showExpiringDialog}
-        onOpenChange={setShowExpiringDialog}
-        clients={expiringClientsList}
-        isLoading={isLoading}
-      />
-
-      <RenewalOpportunitiesThisMonthDialog
-        open={showRenewalDialog}
-        onOpenChange={setShowRenewalDialog}
-        clients={renewalOpportunitiesClients}
+        open={expiringDialogOpen}
+        onOpenChange={setExpiringDialogOpen}
+        clients={expiringClients || []}
         isLoading={isLoading}
       />
 
       <OnboardingClientsDialog
-        open={showOnboardingDialog}
-        onOpenChange={setShowOnboardingDialog}
-        clients={onboardingClientsList}
+        open={onboardingDialogOpen}
+        onOpenChange={setOnboardingDialogOpen}
+        halfClients={metrics.halfOnboardedClients}
+        fullClients={metrics.fullOnboardedClients}
+        isLoading={isLoading}
+      />
+
+      <RenewalOpportunitiesThisMonthDialog
+        open={renewalDialogOpen}
+        onOpenChange={setRenewalDialogOpen}
+        clients={metrics.renewalOpportunitiesClients}
         isLoading={isLoading}
       />
     </div>

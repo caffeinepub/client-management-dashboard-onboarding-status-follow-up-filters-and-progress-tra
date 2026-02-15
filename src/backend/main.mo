@@ -8,11 +8,13 @@ import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
+import Migration "migration";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
 // Apply migration from old to new state on upgrade via the with clause.
 
+(with migration = Migration.run)
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -24,7 +26,7 @@ actor {
 
   let userProfiles = Map.empty<Principal, UserProfile>();
 
-  public query func isReady() : async Bool {
+  public query ({ caller }) func isReady() : async Bool {
     true;
   };
 
@@ -92,14 +94,14 @@ actor {
     };
   };
 
-  type ClientStatus = {
-    #active;
-    #paused;
-  };
-
   type OnboardingState = {
     #half;
     #full;
+  };
+
+  type ClientStatus = {
+    #active;
+    #paused;
   };
 
   type PauseEntry = {
@@ -116,6 +118,11 @@ actor {
     followUpDay : FollowUpDay;
   };
 
+  type PlanDetails = {
+    planDurationDays : Nat;
+    extraDays : Nat;
+  };
+
   type Subscription = {
     planDurationDays : Nat;
     extraDays : Nat;
@@ -126,6 +133,7 @@ actor {
 
   type Client = {
     code : Nat;
+    owner : Principal;
     name : Text;
     mobileNumber : Text;
     notes : Text;
@@ -139,6 +147,7 @@ actor {
     followUpHistory : [FollowUpEntry];
     subscriptions : [Subscription];
     activatedAt : ?Time.Time;
+    initialPlanDetails : ?PlanDetails;
   };
 
   module Client {
@@ -152,7 +161,6 @@ actor {
         };
       };
     };
-
     public func compareByFollowUpDay(client1 : Client, client2 : Client) : Order.Order {
       switch (client1.followUpDay, client2.followUpDay) {
         case (null, null) { #equal };
@@ -163,11 +171,9 @@ actor {
         };
       };
     };
-
     public func getDueFollowUpDay(client : Client) : ?FollowUpDay {
       client.followUpDay;
     };
-
     public func getCurrentSubscription(client : Client) : ?Subscription {
       if (client.subscriptions.size() == 0) { return null };
       let now = Time.now();
@@ -182,7 +188,6 @@ actor {
         ?client.subscriptions[client.subscriptions.size() - 1];
       };
     };
-
     public func getCurrentEndDate(client : Client) : ?Time.Time {
       switch (getCurrentSubscription(client)) {
         case (?sub) { ?sub.endDate };
@@ -206,9 +211,9 @@ actor {
     followUpHistory : [FollowUpEntry];
     subscriptions : [Subscription];
     activatedAt : ?Time.Time;
+    initialPlanDetails : ?PlanDetails;
   };
 
-  // Client Summary Type for Light API
   public type ClientSummary = {
     code : Nat;
     name : Text;
@@ -233,22 +238,28 @@ actor {
     userProfile : ?UserProfile;
   };
 
-  let clients = Map.empty<Nat, Client>();
   var clientCodeCounter = 1;
+
+  let clients = Map.empty<Nat, Client>();
 
   public shared ({ caller }) func createClient(
     name : Text,
     mobileNumber : Text,
     notes : Text,
     initialOnboardingState : OnboardingState,
+    planDurationDays : Nat,
+    extraDays : Nat,
   ) : async Nat {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can create clients");
+    };
 
     let clientCode = clientCodeCounter;
     clientCodeCounter += 1;
 
     let newClient : Client = {
       code = clientCode;
+      owner = caller;
       name;
       mobileNumber;
       notes;
@@ -262,6 +273,7 @@ actor {
       followUpHistory = [];
       subscriptions = [];
       activatedAt = null;
+      initialPlanDetails = ?{ planDurationDays; extraDays };
     };
 
     clients.add(clientCode, newClient);
@@ -274,14 +286,21 @@ actor {
     extraDays : Nat,
     startDate : Time.Time,
   ) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can manage subscriptions");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         if (client.onboardingState != #full) {
           Runtime.trap("Cannot activate client: must complete all onboarding steps first.");
         };
+
         let endDate = startDate + ((planDurationDays + extraDays) * 86_400_000_000_000 : Int);
         let newSubscription : Subscription = {
           planDurationDays;
@@ -303,11 +322,17 @@ actor {
   };
 
   public shared ({ caller }) func expireMembershipImmediately(clientCode : Nat) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can expire memberships");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         let updatedSubscriptions = client.subscriptions.map(
           func(subscription) {
             if (
@@ -336,11 +361,17 @@ actor {
   };
 
   public query ({ caller }) func getCurrentSubscription(clientCode : Nat) : async ?SubscriptionSummary {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view subscriptions");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { null };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only view your own clients");
+        };
+
         let currentSubscription = Client.getCurrentSubscription(client);
         currentSubscription.map(func(subscription) {
           {
@@ -355,11 +386,17 @@ actor {
   };
 
   public shared ({ caller }) func setFollowUpDay(clientCode : Nat, followUpDay : FollowUpDay) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can set follow-up days");
+    };
 
     switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
+      case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         if (client.activatedAt == null) {
           Runtime.trap("Cannot set follow-up day until after client is activated.");
         };
@@ -374,11 +411,17 @@ actor {
   };
 
   public shared ({ caller }) func recordFollowUp(clientCode : Nat, followUpDay : FollowUpDay, done : Bool, notes : Text) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can record follow-ups");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         let newEntry : FollowUpEntry = {
           timestamp = Time.now();
           done;
@@ -398,11 +441,18 @@ actor {
   };
 
   public query ({ caller }) func getFollowUpHistory(clientCode : Nat) : async [FollowUpEntry] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view follow-up history");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { [] };
-      case (?client) { client.followUpHistory };
+      case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only view your own clients");
+        };
+        client.followUpHistory;
+      };
     };
   };
 
@@ -415,11 +465,17 @@ actor {
     hipsInch : Float,
     thighInch : Float,
   ) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can add progress");
+    };
 
     switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
+      case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         let newProgress : ClientProgress = {
           weightKg;
           neckInch;
@@ -441,14 +497,21 @@ actor {
   };
 
   public shared ({ caller }) func pauseClient(clientCode : Nat, durationDays : Nat, reason : Text) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can pause clients");
+    };
 
     switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
+      case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         if (client.status == #paused) {
           Runtime.trap("Client is already paused");
         };
+
         let pauseEntry : PauseEntry = {
           timestamp = Time.now();
           durationDays;
@@ -468,11 +531,17 @@ actor {
   };
 
   public shared ({ caller }) func resumeClient(clientCode : Nat) : async () {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can resume clients");
+    };
 
     switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
+      case (null) { Runtime.trap("Client not found") };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
         switch (client.pauseTime, client.status) {
           case (?pauseStartTime, #paused) {
             let pausedDuration = Time.now() - pauseStartTime;
@@ -514,88 +583,161 @@ actor {
   };
 
   public shared ({ caller }) func updateOnboardingState(clientCode : Nat, state : OnboardingState) : async () {
-    requireUserRole(caller);
-    updateClientOnboardingState(clientCode, state);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can update onboarding state");
+    };
+
+    switch (clients.get(clientCode)) {
+      case (null) { Runtime.trap("Client not found") };
+      case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
+        if (client.activatedAt != null) {
+          Runtime.trap("Cannot update onboarding state for activated clients");
+        };
+
+        let updatedClient = {
+          client with
+          onboardingState = state
+        };
+        clients.add(clientCode, updatedClient);
+      };
+    };
   };
 
-  // Explicit full onboarding conversion method
   public shared ({ caller }) func convertToFullOnboarding(clientCode : Nat) : async () {
-    requireUserRole(caller);
-    updateClientOnboardingState(clientCode, #full);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can convert onboarding state");
+    };
+
+    switch (clients.get(clientCode)) {
+      case (null) { Runtime.trap("Client not found") };
+      case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
+        if (client.activatedAt != null) {
+          Runtime.trap("Cannot update onboarding state for activated clients");
+        };
+
+        let updatedClient = {
+          client with
+          onboardingState = #full
+        };
+        clients.add(clientCode, updatedClient);
+      };
+    };
   };
 
   public query ({ caller }) func getClientsByFollowUpDay(day : FollowUpDay) : async [ExtendedClient] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
-    let filteredClients = clients.values().toArray().filter(
+    let userClients = clients.values().toArray().filter(
       func(client) {
-        client.status == #active and client.followUpDay == ?day and client.activatedAt != null
+        client.owner == caller and client.status == #active and client.followUpDay == ?day and client.activatedAt != null
       }
     );
-    convertToExtendedClients(filteredClients);
+    convertToExtendedClients(userClients);
   };
 
   public query ({ caller }) func getClientProgress(clientCode : Nat) : async [ClientProgress] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view progress");
+    };
 
     switch (clients.get(clientCode)) {
       case (null) { [] };
       case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only view your own clients");
+        };
         client.progress.sort(ClientProgress.compareByTime);
       };
     };
   };
 
   public query ({ caller }) func getExpiringClients() : async [ExtendedClient] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
     let tenDaysFromNow = Time.now() + (10 * 86_400_000_000_000 : Int);
+
     let filteredClients = clients.values().toArray().filter(
       func(client) {
-        switch (Client.getCurrentEndDate(client), client.activatedAt, client.status) {
-          case (?endDate, ?_, #active) {
-            endDate > Time.now() and endDate <= tenDaysFromNow
-          };
-          case (_, _, _) { false };
-        };
+        client.owner == caller and switchByStatus(Client.getCurrentEndDate(client), client.activatedAt, client.status);
       }
     );
     convertToExtendedClients(filteredClients);
   };
 
   public query ({ caller }) func getAllClients() : async [ExtendedClient] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
     let filteredClients = clients.values().toArray().filter(
-      func(client) {
-        client.activatedAt != null;
-      }
+      func(client) { client.owner == caller and client.activatedAt != null }
     );
     convertToExtendedClients(filteredClients);
   };
 
   public query ({ caller }) func filterClientsByOnboardingState(state : OnboardingState) : async [ExtendedClient] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
     let filteredClients = clients.values().toArray().filter(
       func(client) {
-        client.onboardingState == state and client.activatedAt == null;
+        client.owner == caller and client.onboardingState == state and client.activatedAt == null
       }
     );
     convertToExtendedClients(filteredClients);
   };
 
   public shared ({ caller }) func resetOnboardingState(clientCode : Nat) : async () {
-    requireUserRole(caller);
-    updateClientOnboardingState(clientCode, #half);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can reset onboarding state");
+    };
+
+    switch (clients.get(clientCode)) {
+      case (null) { Runtime.trap("Client not found") };
+      case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only manage your own clients");
+        };
+
+        if (client.activatedAt != null) {
+          Runtime.trap("Cannot reset onboarding state for activated clients");
+        };
+
+        let updatedClient = {
+          client with
+          onboardingState = #half
+        };
+        clients.add(clientCode, updatedClient);
+      };
+    };
   };
 
-  // New query to fetch single client by code
   public query ({ caller }) func getClientByCode(clientCode : Nat) : async ?ExtendedClient {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
+
     switch (clients.get(clientCode)) {
       case (null) { null };
-      case (?client) { ?convertToExtendedClient(client) };
+      case (?client) {
+        if (client.owner != caller) {
+          Runtime.trap("Unauthorized: You can only view your own clients");
+        };
+        ?convertToExtendedClient(client);
+      };
     };
   };
 
@@ -604,9 +746,13 @@ actor {
     halfOnboardedClients : [ExtendedClient];
     fullOnboardedClients : [ExtendedClient];
   } {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
-    let allClients = clients.values().toArray();
+    let allClients = clients.values().toArray().filter(
+      func(client) { client.owner == caller }
+    );
 
     let activated = allClients.filter(
       func(client) { client.activatedAt != null }
@@ -627,23 +773,26 @@ actor {
     };
   };
 
-  // New queries to fetch lightweight client summaries
   public query ({ caller }) func getClientSummaries() : async [ClientSummary] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
     let filteredClients = clients.values().toArray().filter(
       func(client) {
-        client.activatedAt != null;
+        client.owner == caller and client.activatedAt != null
       }
     );
     convertToClientSummaries(filteredClients);
   };
 
   public query ({ caller }) func getActivatedClientSummaries() : async [ClientSummary] {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
     let filteredClients = clients.values().toArray().filter(
-      func(client) { client.activatedAt != null }
+      func(client) { client.owner == caller and client.activatedAt != null }
     );
     convertToClientSummaries(filteredClients);
   };
@@ -652,9 +801,13 @@ actor {
     halfOnboardedClients : [ClientSummary];
     fullOnboardedClients : [ClientSummary];
   } {
-    requireUserRole(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view clients");
+    };
 
-    let allClients = clients.values().toArray();
+    let allClients = clients.values().toArray().filter(
+      func(client) { client.owner == caller }
+    );
 
     let halfOnboarded = allClients.filter(
       func(client) { client.onboardingState == #half and client.activatedAt == null }
@@ -670,37 +823,29 @@ actor {
     };
   };
 
-  // New: optimized query to return initial app data
   public query ({ caller }) func getAppInitData() : async AppInitData {
-    requireUserRole(caller);
-    let clientSummaries = clients.toArray().map(func((_, client)) { convertToClientSummary(client) });
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can access app data");
+    };
+
+    let userClients = clients.values().toArray().filter(
+      func(client) { client.owner == caller }
+    );
+
+    let clientSummaries = userClients.map(
+      func(client) { convertToClientSummary(client) }
+    );
     let userProfile = userProfiles.get(caller);
     { clientSummaries; userProfile };
   };
 
-  func trapNotFound(item : Text) : () {
-    Runtime.trap(item # " not found");
-  };
-
-  func updateClientOnboardingState(clientCode : Nat, state : OnboardingState) : () {
-    switch (clients.get(clientCode)) {
-      case (null) { trapNotFound("Client") };
-      case (?client) {
-        if (client.activatedAt != null) {
-          Runtime.trap("Cannot change onboarding state of activated client");
-        };
-        let updatedClient = {
-          client with
-          onboardingState = state
-        };
-        clients.add(clientCode, updatedClient);
+  func switchByStatus(result : ?Time.Time, activatedAt : ?Time.Time, status : ClientStatus) : Bool {
+    let tenDaysFromNow = Time.now() + (10 * 86_400_000_000_000 : Int);
+    switch (result, activatedAt, status) {
+      case (?endDate, ?_, #active) {
+        endDate > Time.now() and endDate <= tenDaysFromNow
       };
-    };
-  };
-
-  func requireUserRole(principal : Principal) {
-    if (not (AccessControl.hasPermission(accessControlState, principal, #user))) {
-      Runtime.trap("Unauthorized: Only users can perform this action");
+      case (_, _, _) { false };
     };
   };
 
@@ -720,6 +865,7 @@ actor {
       followUpHistory = client.followUpHistory;
       subscriptions = client.subscriptions;
       activatedAt = client.activatedAt;
+      initialPlanDetails = client.initialPlanDetails;
     };
   };
 

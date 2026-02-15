@@ -34,6 +34,7 @@ interface ClientsMetricDialogProps {
   emptyMessage: string;
   showPlanEndDate?: boolean;
   showOnboardingState?: boolean;
+  showOnboardingPlanDetails?: boolean;
 }
 
 export function ClientsMetricDialog({
@@ -46,6 +47,7 @@ export function ClientsMetricDialog({
   emptyMessage,
   showPlanEndDate = false,
   showOnboardingState = false,
+  showOnboardingPlanDetails = false,
 }: ClientsMetricDialogProps) {
   const { navigate } = useRouter();
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -118,6 +120,12 @@ export function ClientsMetricDialog({
                         <TableHead>Mobile Number</TableHead>
                         {showPlanEndDate && <TableHead>Plan End Date</TableHead>}
                         {showOnboardingState && <TableHead>Onboarding State</TableHead>}
+                        {showOnboardingPlanDetails && (
+                          <>
+                            <TableHead>Plan Duration</TableHead>
+                            <TableHead>Extra Days</TableHead>
+                          </>
+                        )}
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -151,6 +159,12 @@ export function ClientsMetricDialog({
                                 {client.onboardingState === 'half' ? 'Half' : 'Full'}
                               </span>
                             </TableCell>
+                          )}
+                          {showOnboardingPlanDetails && (
+                            <>
+                              <TableCell className="text-muted-foreground">—</TableCell>
+                              <TableCell className="text-muted-foreground">—</TableCell>
+                            </>
                           )}
                           <TableCell className="text-right">
                             <Button

@@ -105,223 +105,65 @@ export function useSaveCallerUserProfile() {
  * Fetch lightweight client summaries for list views and dashboard.
  * This is the primary query for initial page loads.
  */
-export function useGetClientSummaries() {
+export function useGetAllClientSummaries() {
   const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
-  return useQuery({
+  return useQuery<ClientSummary[]>({
     queryKey: ['clientSummaries', identityKey],
     queryFn: async () => {
-      if (!actor) return { activated: [], half: [], full: [] };
-      
-      // Fetch both activated and non-activated summaries in parallel
-      const [activated, nonActivated] = await Promise.all([
-        actor.getActivatedClientSummaries(),
-        actor.getNonActivatedClientSummaries(),
-      ]);
-      
-      return {
-        activated,
-        half: nonActivated.halfOnboardedClients,
-        full: nonActivated.fullOnboardedClients,
-      };
-    },
-    enabled: !!actor && isReady,
-    staleTime: 60_000, // 1 minute
-    gcTime: 5 * 60_000, // 5 minutes
-  });
-}
-
-/**
- * Derive all client summaries as a flat array.
- */
-export function useGetAllClientSummaries() {
-  const { data, isLoading } = useGetClientSummaries();
-
-  const allSummaries = useMemo(() => {
-    if (!data) return [];
-    return [...data.activated, ...data.half, ...data.full];
-  }, [data]);
-
-  return {
-    data: allSummaries,
-    isLoading,
-  };
-}
-
-/**
- * Legacy hook for full client data - now only used when full details are needed.
- * Prefer useGetClientSummaries for list views.
- */
-export function useGetAllClients() {
-  const { actor, isReady } = useBackendReadiness();
-  const identityKey = useIdentityKey();
-
-  return useQuery({
-    queryKey: ['clients', identityKey],
-    queryFn: async () => {
-      if (!actor) return [];
-      
-      // Single backend call to get all clients with full details
-      const result = await actor.getAllClientsAndNonActivatedClients();
-      
-      // Combine all three arrays into one
-      return [
-        ...result.activatedClients,
-        ...result.halfOnboardedClients,
-        ...result.fullOnboardedClients,
-      ];
-    },
-    enabled: !!actor && isReady,
-    staleTime: 60_000, // 1 minute
-    gcTime: 5 * 60_000, // 5 minutes
-  });
-}
-
-/**
- * Fetch full client details for a specific client by code.
- */
-export function useGetClient(clientCode: bigint | null) {
-  const { actor, isReady } = useBackendReadiness();
-  const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
-
-  return useQuery({
-    queryKey: ['client', clientCode?.toString(), identityKey],
-    queryFn: async () => {
-      if (!actor || !clientCode) return null;
-      
-      // First, check if we have the client in the cached full clients list
-      const allClients = queryClient.getQueryData<ExtendedClient[]>(['clients', identityKey]);
-      if (allClients) {
-        const cached = allClients.find((c) => c.code === clientCode);
-        if (cached) return cached;
-      }
-
-      // If not in cache, fetch single client by code
-      return actor.getClientByCode(clientCode);
-    },
-    enabled: !!actor && isReady && clientCode !== null,
-    staleTime: 30_000, // 30 seconds
-    gcTime: 5 * 60_000, // 5 minutes
-  });
-}
-
-/**
- * Mutation to prepare full client data for export.
- * Fetches full ExtendedClient records for a given set of client codes.
- */
-export function usePrepareClientsForExport() {
-  const { actor } = useBackendReadiness();
-  const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (clientCodes: bigint[]) => {
       if (!actor) throw new Error('Actor not available');
-      
-      // Check cache first
-      const cachedClients = queryClient.getQueryData<ExtendedClient[]>(['clients', identityKey]);
-      if (cachedClients) {
-        const allCached = clientCodes.every(code => 
-          cachedClients.some(c => c.code === code)
-        );
-        if (allCached) {
-          return cachedClients.filter(c => clientCodes.some(code => code === c.code));
-        }
-      }
-
-      // Fetch full data if not cached
-      const result = await actor.getAllClientsAndNonActivatedClients();
-      const allClients = [
-        ...result.activatedClients,
-        ...result.halfOnboardedClients,
-        ...result.fullOnboardedClients,
-      ];
-      
-      // Update cache
-      queryClient.setQueryData(['clients', identityKey], allClients);
-      
-      // Return filtered clients
-      return allClients.filter(c => clientCodes.some(code => code === c.code));
+      const data = await actor.getAppInitData();
+      return data.clientSummaries;
+    },
+    enabled: !!actor && isReady,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    select: (data) => {
+      // Return all summaries (activated and non-activated)
+      return data;
     },
   });
 }
 
-/**
- * Derive clients by follow-up day from cached summary data.
- */
-export function useGetClientsByFollowUpDay(day: FollowUpDay | null) {
-  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
-
-  const filteredClients = useMemo(() => {
-    if (!allSummaries || !day) return [];
-    
-    // Filter client-side from cached summary data
-    return allSummaries.filter(client => 
-      isClientActivated(client) && 
-      client.status === 'active' && 
-      client.followUpDay === day
-    );
-  }, [allSummaries, day]);
-
-  return {
-    data: filteredClients,
-    isLoading,
-  };
-}
-
-/**
- * Derive expiring clients from cached summary data.
- * Expiring clients are activated, currently active (not paused, not expired),
- * and have an end date within the next 10 days.
- */
-export function useGetExpiringClients() {
-  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
-
-  const expiringClients = useMemo(() => {
-    if (!allSummaries) return [];
-    
-    // Compute expiring status client-side using 10-day window
-    const now = BigInt(Date.now() * 1_000_000);
-    const expiringWindowEnd = now + (BigInt(EXPIRING_WINDOW_DAYS) * 86_400_000_000_000n);
-    
-    return allSummaries.filter(client => {
-      // Must be activated
-      if (!isClientActivated(client)) return false;
-      
-      // Must have an end date
-      const endDate = client.subscriptionSummary?.endDate;
-      if (!endDate) return false;
-      
-      // Must be currently active (not paused, not expired)
-      const status = getClientStatus(client);
-      if (status !== 'active') return false;
-      
-      // End date must be within the expiring window (> now and <= now + 10 days)
-      return endDate > now && endDate <= expiringWindowEnd;
-    });
-  }, [allSummaries]);
-
-  return {
-    data: expiringClients,
-    isLoading,
-  };
-}
-
-export function useGetClientProgress(clientCode: bigint | null) {
+export function useGetActivatedClientSummaries() {
   const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
 
-  return useQuery({
-    queryKey: ['clientProgress', clientCode?.toString(), identityKey],
+  return useQuery<ClientSummary[]>({
+    queryKey: ['clientSummaries', identityKey],
     queryFn: async () => {
-      if (!actor || !clientCode) return [];
-      return actor.getClientProgress(clientCode);
+      if (!actor) throw new Error('Actor not available');
+      const data = await actor.getAppInitData();
+      return data.clientSummaries;
     },
-    enabled: !!actor && isReady && clientCode !== null,
-    staleTime: 30_000, // 30 seconds
-    gcTime: 5 * 60_000, // 5 minutes
+    enabled: !!actor && isReady,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    select: (data) => {
+      return data.filter(c => c.activatedAt !== undefined);
+    },
+  });
+}
+
+export function useGetNonActivatedClientSummaries() {
+  const { actor, isReady } = useBackendReadiness();
+  const identityKey = useIdentityKey();
+
+  return useQuery<{ half: ClientSummary[]; full: ClientSummary[] }>({
+    queryKey: ['clientSummaries', identityKey],
+    queryFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      const data = await actor.getAppInitData();
+      
+      const half = data.clientSummaries.filter(c => c.onboardingState === 'half' && c.activatedAt === undefined);
+      const full = data.clientSummaries.filter(c => c.onboardingState === 'full' && c.activatedAt === undefined);
+      
+      return { half, full };
+    },
+    enabled: !!actor && isReady,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
 }
 
@@ -336,110 +178,71 @@ export function useCreateClient() {
       mobileNumber: string;
       notes: string;
       onboardingState: OnboardingState;
+      planDurationDays: bigint;
+      extraDays: bigint;
     }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.createClient(
         params.name,
         params.mobileNumber,
         params.notes,
-        params.onboardingState
+        params.onboardingState,
+        params.planDurationDays,
+        params.extraDays
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
 
-export function useActivateClient() {
-  const { actor } = useBackendReadiness();
+export function useGetClientByCode(clientCode: bigint | null) {
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (params: {
-      clientCode: bigint;
-      startDate: Time;
-      followUpDay: FollowUpDay;
-    }) => {
-      if (!actor) throw new Error('Actor not available');
-      
-      // Get the client to extract plan duration
-      const client = await actor.getClientByCode(params.clientCode);
-      if (!client) throw new Error('Client not found');
-      
-      // Use the first subscription's plan duration if it exists, otherwise default to 30 days
-      const planDurationDays = client.subscriptions && client.subscriptions.length > 0
-        ? client.subscriptions[0].planDurationDays
-        : 30n;
-      
-      // Create the initial subscription
-      await actor.createOrRenewSubscription(
-        params.clientCode,
-        planDurationDays,
-        0n, // No extra days for initial activation
-        params.startDate
-      );
-      
-      // Set the follow-up day
-      await actor.setFollowUpDay(params.clientCode, params.followUpDay);
+  return useQuery<ExtendedClient | null>({
+    queryKey: ['client', identityKey, clientCode?.toString()],
+    queryFn: async () => {
+      if (!actor || clientCode === null) return null;
+      return actor.getClientByCode(clientCode);
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
-    },
+    enabled: !!actor && isReady && clientCode !== null,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   });
 }
 
-export function useRenewSubscription() {
-  const { actor } = useBackendReadiness();
+export function useGetExpiringClients() {
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (params: {
-      clientCode: bigint;
-      planDurationDays: bigint;
-      extraDays: bigint;
-      startDate: Time;
-    }) => {
+  return useQuery<ExtendedClient[]>({
+    queryKey: ['expiringClients', identityKey],
+    queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return actor.createOrRenewSubscription(
-        params.clientCode,
-        params.planDurationDays,
-        params.extraDays,
-        params.startDate
-      );
+      return actor.getExpiringClients();
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
-    },
+    enabled: !!actor && isReady,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
 }
 
-export function useExpireMembership() {
-  const { actor } = useBackendReadiness();
+export function useGetClientProgress(clientCode: bigint | null) {
+  const { actor, isReady } = useBackendReadiness();
   const identityKey = useIdentityKey();
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (clientCode: bigint) => {
-      if (!actor) throw new Error('Actor not available');
-      return actor.expireMembershipImmediately(clientCode);
+  return useQuery({
+    queryKey: ['clientProgress', identityKey, clientCode?.toString()],
+    queryFn: async () => {
+      if (!actor || clientCode === null) return [];
+      return actor.getClientProgress(clientCode);
     },
-    onSuccess: (_data, clientCode) => {
-      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
-    },
+    enabled: !!actor && isReady && clientCode !== null,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   });
 }
 
@@ -469,9 +272,39 @@ export function useAddProgress() {
         params.thighInch
       );
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clientProgress', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['clientProgress', identityKey, variables.clientCode.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, variables.clientCode.toString()] });
+    },
+  });
+}
+
+export function useActivateClient() {
+  const { actor } = useBackendReadiness();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      clientCode: bigint;
+      planDurationDays: bigint;
+      extraDays: bigint;
+      startDate: Time;
+      followUpDay: FollowUpDay;
+    }) => {
+      if (!actor) throw new Error('Actor not available');
+      await actor.createOrRenewSubscription(
+        params.clientCode,
+        params.planDurationDays,
+        params.extraDays,
+        params.startDate
+      );
+      await actor.setFollowUpDay(params.clientCode, params.followUpDay);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, variables.clientCode.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
@@ -482,18 +315,13 @@ export function usePauseClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: {
-      clientCode: bigint;
-      durationDays: bigint;
-      reason: string;
-    }) => {
+    mutationFn: async (params: { clientCode: bigint; durationDays: bigint; reason: string }) => {
       if (!actor) throw new Error('Actor not available');
       return actor.pauseClient(params.clientCode, params.durationDays, params.reason);
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, variables.clientCode.toString()] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
@@ -509,16 +337,15 @@ export function useResumeClient() {
       if (!actor) throw new Error('Actor not available');
       return actor.resumeClient(clientCode);
     },
-    onSuccess: (_data, clientCode) => {
-      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
+    onSuccess: (_, clientCode) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, clientCode.toString()] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
 
-export function useUpdateOnboardingState() {
+export function useRenewSubscription() {
   const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
@@ -526,21 +353,27 @@ export function useUpdateOnboardingState() {
   return useMutation({
     mutationFn: async (params: {
       clientCode: bigint;
-      state: OnboardingState;
+      planDurationDays: bigint;
+      extraDays: bigint;
+      startDate: Time;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.updateOnboardingState(params.clientCode, params.state);
+      return actor.createOrRenewSubscription(
+        params.clientCode,
+        params.planDurationDays,
+        params.extraDays,
+        params.startDate
+      );
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, variables.clientCode.toString()] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
 }
 
-export function useConvertToFullOnboarding() {
+export function useExpireMembership() {
   const { actor } = useBackendReadiness();
   const identityKey = useIdentityKey();
   const queryClient = useQueryClient();
@@ -548,12 +381,11 @@ export function useConvertToFullOnboarding() {
   return useMutation({
     mutationFn: async (clientCode: bigint) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.convertToFullOnboarding(clientCode);
+      return actor.expireMembershipImmediately(clientCode);
     },
-    onSuccess: (_data, clientCode) => {
-      queryClient.invalidateQueries({ queryKey: ['client', clientCode.toString(), identityKey] });
+    onSuccess: (_, clientCode) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, clientCode.toString()] });
       queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clients', identityKey] });
       queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
     },
   });
@@ -572,16 +404,85 @@ export function useRecordFollowUp() {
       notes: string;
     }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.recordFollowUp(
-        params.clientCode,
-        params.followUpDay,
-        params.done,
-        params.notes
-      );
+      return actor.recordFollowUp(params.clientCode, params.followUpDay, params.done, params.notes);
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['client', variables.clientCode.toString(), identityKey] });
-      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, variables.clientCode.toString()] });
     },
   });
+}
+
+export function useConvertToFullOnboarding() {
+  const { actor } = useBackendReadiness();
+  const identityKey = useIdentityKey();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientCode: bigint) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.convertToFullOnboarding(clientCode);
+    },
+    onSuccess: (_, clientCode) => {
+      queryClient.invalidateQueries({ queryKey: ['client', identityKey, clientCode.toString()] });
+      queryClient.invalidateQueries({ queryKey: ['clientSummaries', identityKey] });
+      queryClient.invalidateQueries({ queryKey: ['appInitData', identityKey] });
+    },
+  });
+}
+
+/**
+ * Prepare clients for export by fetching full ExtendedClient data for given codes.
+ */
+export function usePrepareClientsForExport() {
+  const { actor } = useBackendReadiness();
+
+  return useMutation({
+    mutationFn: async (clientCodes: bigint[]): Promise<ExtendedClient[]> => {
+      if (!actor) throw new Error('Actor not available');
+      
+      const clients = await Promise.all(
+        clientCodes.map(code => actor.getClientByCode(code))
+      );
+      
+      return clients.filter((c): c is ExtendedClient => c !== null);
+    },
+  });
+}
+
+/**
+ * Dashboard metrics computed from client summaries
+ */
+export function useDashboardMetrics() {
+  const { data: allSummaries, isLoading } = useGetAllClientSummaries();
+  const { data: expiringClients } = useGetExpiringClients();
+
+  return useMemo(() => {
+    if (!allSummaries) {
+      return {
+        total: 0,
+        active: 0,
+        paused: 0,
+        expiring: 0,
+        halfOnboarded: 0,
+        fullOnboarded: 0,
+        isLoading,
+      };
+    }
+
+    const activated = allSummaries.filter(c => isClientActivated(c));
+    const active = activated.filter(c => getClientStatus(c) !== 'paused' && getClientStatus(c) !== 'expired');
+    const paused = activated.filter(c => getClientStatus(c) === 'paused');
+    const halfOnboarded = allSummaries.filter(c => c.onboardingState === 'half' && !isClientActivated(c));
+    const fullOnboarded = allSummaries.filter(c => c.onboardingState === 'full' && !isClientActivated(c));
+
+    return {
+      total: allSummaries.length,
+      active: active.length,
+      paused: paused.length,
+      expiring: expiringClients?.length || 0,
+      halfOnboarded: halfOnboarded.length,
+      fullOnboarded: fullOnboarded.length,
+      isLoading,
+    };
+  }, [allSummaries, expiringClients, isLoading]);
 }

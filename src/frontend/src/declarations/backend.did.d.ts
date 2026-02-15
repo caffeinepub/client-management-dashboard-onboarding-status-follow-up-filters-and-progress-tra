@@ -46,6 +46,7 @@ export interface ExtendedClient {
   'pauseTime' : [] | [Time],
   'totalPausedDuration' : bigint,
   'mobileNumber' : string,
+  'initialPlanDetails' : [] | [PlanDetails],
   'followUpHistory' : Array<FollowUpEntry>,
   'progress' : Array<ClientProgress>,
   'notes' : string,
@@ -72,6 +73,10 @@ export interface PauseEntry {
   'resumed' : boolean,
   'timestamp' : Time,
   'reason' : string,
+}
+export interface PlanDetails {
+  'extraDays' : bigint,
+  'planDurationDays' : bigint,
 }
 export interface Subscription {
   'endDate' : Time,
@@ -100,7 +105,7 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'convertToFullOnboarding' : ActorMethod<[bigint], undefined>,
   'createClient' : ActorMethod<
-    [string, string, string, OnboardingState],
+    [string, string, string, OnboardingState, bigint, bigint],
     bigint
   >,
   'createOrRenewSubscription' : ActorMethod<

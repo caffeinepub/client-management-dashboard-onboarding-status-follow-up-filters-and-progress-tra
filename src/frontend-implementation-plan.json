@@ -1,143 +1,72 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Dark mode toggle + bold, high-contrast CRM theme (colors + typography + layout)",
+  "title": "Add onboarding plan subscription details to onboarding flow and display across onboarding lists and profiles",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Add a runtime theme toggle (Light/Dark/System) using class-based dark mode via existing next-themes ThemeProvider.",
+      "summary": "Add plan subscription inputs (plan duration and extra days) into the onboarding wizard, show them on the Review step, and keep them visible after client creation while still onboarding.",
       "acceptanceCriteria": [
-        "A theme toggle control is available in the authenticated app UI (e.g., header user menu) with options at minimum: Light, Dark, and System.",
-        "Toggling theme updates the document theme class (via the existing next-themes ThemeProvider usage) and immediately updates colors across pages (Login, Dashboard, Clients, Onboard, Client Profile).",
-        "Theme selection persists across refresh (next-themes persistence).",
-        "No changes are made to any files listed under frontend immutablePaths."
+        "The onboarding wizard includes input controls for plan duration (in days or months) and extra days, with clear English labels.",
+        "The Review & Confirm step displays the selected plan duration and extra days.",
+        "After successfully creating the client, the success screen or next navigation (e.g., Client Profile) allows the coach to see the recorded plan duration and extra days for that client while they are still in onboarding (not yet activated)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/components/theme/ThemeToggleMenu.tsx",
+          "path": "frontend/src/pages/OnboardClientPage.tsx",
+          "operation": "modify",
+          "description": "Extend the onboarding form state to capture plan duration (value + unit: days/months) and extra days; add a new “Plan Subscription” section to the wizard flow (either as a dedicated step or within the existing step structure), render clear English-labeled inputs, validate numeric inputs, include the values in the Review & Confirm UI, and show the recorded values on the post-create success screen alongside the created client code."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Update the create-client mutation hook to accept onboarding-time plan details and pass them through the existing createClient backend call (planDurationDays and extraDays), and ensure relevant queries are invalidated so the newly created client’s plan details appear immediately in subsequent onboarding/client views."
+        },
+        {
+          "path": "frontend/src/components/onboarding/PlanSubscriptionSection.tsx",
           "operation": "create",
-          "description": "Create a small authenticated-UI theme switcher that uses next-themes (useTheme) to set theme to Light/Dark/System and renders as dropdown menu items suitable for placing in the header user menu."
-        },
-        {
-          "path": "frontend/src/components/layout/AppLayout.tsx",
-          "operation": "modify",
-          "description": "Wire the new ThemeToggleMenu into the authenticated header user dropdown, adding Light/Dark/System options and ensuring the control is discoverable alongside logout."
-        },
-        {
-          "path": "frontend/src/App.tsx",
-          "operation": "modify",
-          "description": "Confirm ThemeProvider configuration remains class-based (attribute=\"class\") and supports System theme; adjust defaults only if needed to align with Light/Dark/System toggle behavior without changing routing/auth logic."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Refresh global semantic color tokens for a vivid, bold, high-contrast palette across light and dark modes, avoiding hard-coded colors in page components.",
-      "acceptanceCriteria": [
-        "Global theme variables are updated (in the active global Tailwind theme CSS) so that primary/secondary/accent/muted/border/ring and chart colors look noticeably bolder in both light and dark mode.",
-        "Primary actions (buttons/active nav states), key highlights (badges/metrics), and hover states visibly reflect the updated palette without reducing legibility.",
-        "Dark mode background is a deep neutral (near-black/charcoal) with clear separation between background, card, and popover surfaces.",
-        "No hard-coded colors are introduced in page components where semantic tokens (bg-background, text-foreground, bg-card, text-muted-foreground, text-primary, bg-accent, etc.) can be used instead."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/index.css",
-          "operation": "modify",
-          "description": "Update the OKLCH CSS variables for :root and .dark to a bolder, higher-contrast palette (primary/secondary/accent/muted/border/ring + chart colors) while preserving readability and clear surface separation (background/card/popover)."
-        },
-        {
-          "path": "frontend/src/pages/OnboardClientPage.tsx",
-          "operation": "modify",
-          "description": "Replace any hard-coded success/brand colors (e.g., green-*) with semantic theme tokens (primary/accent/muted/destructive) so the palette changes apply consistently in both light/dark."
-        },
-        {
-          "path": "frontend/src/components/auth/LoginGate.tsx",
-          "operation": "modify",
-          "description": "Ensure hero/gradient/illustrative styling relies on semantic tokens (background/accent/primary/muted) and does not introduce new hard-coded colors that bypass the global palette."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Establish a stronger, consistent typography hierarchy (titles/headings) and improve spacing rhythm across key pages and layout.",
-      "acceptanceCriteria": [
-        "Page titles (e.g., \"Dashboard\", \"Clients\") render with a consistent, strong hierarchy (size/weight/tracking) across pages.",
-        "Section headings inside cards/dialogs/forms also follow a consistent heading scale (e.g., h2/h3 styles) with appropriate spacing.",
-        "Global base styles include sensible defaults for h1–h4 (or a shared utility pattern) so headings look consistent without repetitive per-page styling.",
-        "Key screens (DashboardPage, ClientsListPage, LoginGate, AppLayout header/footer) have improved spacing and alignment for an overall cleaner, more visually appealing layout without changing app functionality."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/index.css",
-          "operation": "modify",
-          "description": "Add/adjust global base typography styles for h1–h4 (size/weight/tracking/spacing) and supporting rhythm defaults (e.g., consistent margins for headings) using Tailwind @layer base so pages can rely on shared hierarchy."
-        },
-        {
-          "path": "frontend/src/pages/DashboardPage.tsx",
-          "operation": "modify",
-          "description": "Align page header structure with the global heading hierarchy (use consistent heading elements/classes) and tighten spacing for a cleaner dashboard layout without changing metrics/dialog behavior."
-        },
-        {
-          "path": "frontend/src/pages/ClientsListPage.tsx",
-          "operation": "modify",
-          "description": "Normalize the page title/subtitle hierarchy and header row spacing (title, actions, search/filter controls) to match the new global typography rhythm without changing filtering/export behavior."
-        },
-        {
-          "path": "frontend/src/pages/OnboardClientPage.tsx",
-          "operation": "modify",
-          "description": "Apply the consistent page-title/section-heading hierarchy to the onboarding header and review section headings, improving spacing/scanability while preserving the wizard flow and validation logic."
-        },
-        {
-          "path": "frontend/src/pages/ClientProfilePage.tsx",
-          "operation": "modify",
-          "description": "Apply consistent title/heading hierarchy for the client name header and section card titles; refine spacing between header, summary cards, and tab sections without changing client actions or data rendering."
-        },
-        {
-          "path": "frontend/src/components/layout/AppLayout.tsx",
-          "operation": "modify",
-          "description": "Refine header/footer layout rhythm (container padding, vertical alignment, nav spacing) to better match the updated typography scale while preserving routes/navigation behavior."
+          "description": "Create a reusable onboarding UI section component to collect plan duration (days/months) and extra days using existing composed UI primitives (do not edit files under frontend/src/components/ui)."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Apply a cohesive modern, bold, professional visual theme across surfaces and interactive states (header/nav/cards/dialogs/tables/empty states) with no backend changes.",
+      "summary": "Display onboarding plan duration and extra days across onboarding client lists and client profile views for non-activated clients with clear English labels and sensible empty states.",
       "acceptanceCriteria": [
-        "The UI uses a consistent theme style across header, navigation, cards, dialogs, tables, and empty states (no mixed styling patterns).",
-        "Theme direction avoids generic default styling by using clear surface elevation (subtle shadows/borders), purposeful accent usage, and consistent rounding.",
-        "The chosen theme does not rely on a blue/purple primary palette (unless already present and explicitly kept); it should look distinct and intentional.",
-        "No backend changes are required for the theme update."
+        "Onboarding client list UI (e.g., dashboard onboarding dialog and/or clients list) shows the onboarding plan duration and extra days for each onboarding client when available.",
+        "Client detail/profile UI shows the onboarding plan duration and extra days for non-activated clients, distinct from the activated subscription history table.",
+        "All user-facing labels and empty states are in English and remain understandable when plan details are missing."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/index.css",
+          "path": "frontend/src/backend.d.ts",
           "operation": "modify",
-          "description": "Adjust global base styles to reinforce a consistent surface system (background/card/popover separation), interactive focus/hover affordances via semantic tokens, and consistent rounding/elevation cues aligned with the updated palette."
-        },
-        {
-          "path": "frontend/src/components/layout/AppLayout.tsx",
-          "operation": "modify",
-          "description": "Unify header/nav styling patterns (active vs inactive states, surface translucency, borders/shadows) and ensure all styling continues to use semantic tokens for both light/dark modes."
-        },
-        {
-          "path": "frontend/src/pages/DashboardPage.tsx",
-          "operation": "modify",
-          "description": "Ensure metric cards and hover states consistently reflect the new bold theme direction (semantic accents, subtle elevation) without introducing hard-coded colors or altering behavior."
-        },
-        {
-          "path": "frontend/src/pages/ClientsListPage.tsx",
-          "operation": "modify",
-          "description": "Ensure list cards and empty states match the same surface/elevation/hover treatment used elsewhere, relying on semantic tokens and consistent rounding."
+          "description": "Update frontend type definitions to reflect that onboarding client summary/detail payloads can include onboarding-time plan details (e.g., add an optional initialPlanDetails field on ClientSummary if returned by the backend), so UI code can safely render plan duration and extra days."
         },
         {
           "path": "frontend/src/pages/ClientProfilePage.tsx",
           "operation": "modify",
-          "description": "Ensure section cards, tabs, and dialogs align with the unified theme direction (surfaces, borders, interactive states) while keeping all existing client-management functionality intact."
+          "description": "Update the Plan Details card to render onboarding-time plan duration and extra days when the client is not activated and has no active subscription yet (use initialPlanDetails when present), clearly distinguishing it from activated subscription information and keeping English placeholders (e.g., “—” / “Not recorded”)."
         },
         {
-          "path": "frontend/src/components/auth/LoginGate.tsx",
+          "path": "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
           "operation": "modify",
-          "description": "Bring the unauthenticated login screen styling (hero surface, emphasis, spacing) in line with the cohesive bold theme using the shared token system."
+          "description": "Enhance the onboarding clients table to include columns/rows for onboarding plan duration and extra days (when available) with clear English labels and graceful fallbacks when missing."
+        },
+        {
+          "path": "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+          "operation": "modify",
+          "description": "Add optional support to render onboarding plan duration and extra days in metric list tables when the provided client summaries represent non-activated (onboarding) clients, without changing existing activated-client behaviors or labels."
+        },
+        {
+          "path": "frontend/src/pages/ClientsListPage.tsx",
+          "operation": "modify",
+          "description": "Update the clients list UI to show onboarding plan duration and extra days for non-activated clients (where appropriate in the list item layout), ensuring labels and empty states are in English and remain understandable when plan details are absent."
+        },
+        {
+          "path": "frontend/src/utils/clientExportFields.ts",
+          "operation": "modify",
+          "description": "Extend exportable fields to include onboarding plan duration (days) and onboarding extra days for non-activated clients when available, with English column labels and safe fallbacks for missing data."
         }
       ]
     }

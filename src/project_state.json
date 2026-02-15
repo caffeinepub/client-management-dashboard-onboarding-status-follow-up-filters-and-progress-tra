@@ -1,38 +1,25 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Theme/UI enhancement pass: enable dark mode and improve visual design (bold colors, heading styles, appealing layout).",
+  "summary": "New project",
   "architectural_notes": [],
-  "known_issues": [],
-  "isFixRequest": false,
+  "known_issues": [
+    "Plan subscription section missing during client onboarding (cannot see purchased plan and extra days).",
+    "User data not separated across accounts: logging in with different Gmail IDs shows the same data."
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-add-an-in-app-dark-mode-capability-that-users-can-toggle-at-runtime-and-ensure-the-entire-ui-correctly-switches-between-light-and-dark-themes-using-class-based-dark-mode",
-      "title": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
+      "id": "feature-add-a-plan-subscription-section-to-the-client-onboarding-flow-so-the-coach-can-record-which-plan-the-client-purchased-and-how-many-extra-days-were-added-and-make-these-values-visible-on-the-onboarding-review-step-and-after-client-creation",
+      "title": "Add a plan subscription section to the client onboarding flow so the coach can record which plan the client purchased and how many extra days were added, and make these values visible on the onboarding review step and after client creation.",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-the-global-color-palette-tokens-for-both-light-and-dark-modes-to-use-a-more-vivid-bold-and-high-contrast-scheme-while-keeping-text-readable-and-accessible-and-apply-it-consistently-across-the-app",
-      "title": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-improve-typography-hierarchy-by-making-page-titles-and-section-headings-more-prominent-bold-consistent-sizing-spacing-and-tracking-and-ensure-a-cohesive-layout-rhythm-across-the-main-pages",
-      "title": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
-      "reqIds": [
-        "REQ-3"
-      ],
-      "version": 1
-    },
-    {
-      "id": "feature-apply-one-coherent-visual-theme-direction-across-the-app-colors-typography-surfaces-and-interactive-states-that-looks-modern-and-bold-while-remaining-professional-for-a-crm-fitness-coaching-context",
-      "title": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
+      "id": "feature-update-the-frontend-data-fetching-and-list-detail-ui-to-display-the-recorded-onboarding-plan-duration-and-extra-days-for-onboarding-clients-including-in-any-onboarding-client-list-dialogs-and-client-profile-views-where-appropriate",
+      "title": "Update the frontend data-fetching and list/detail UI to display the recorded onboarding plan duration and extra days for onboarding clients (including in any onboarding client list dialogs and client profile views where appropriate).",
       "reqIds": [
         "REQ-4"
       ],
@@ -42,18 +29,34 @@
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Enable dark mode theme for the page",
+      "summary": "Show plan subscription details during client onboarding (plan purchased and extra days added)",
       "reqIds": [],
       "status": "pending"
     },
     {
       "id": "AR-2",
-      "summary": "Refresh UI styling: bold color palette, improved title/heading typography, and more appealing layout",
+      "summary": "Fix user data isolation issue: different Gmail logins currently see the same data",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Persist the onboarding-time plan details (plan duration and extra days) for each client in the backend data model, and return these details in the APIs used by onboarding client lists and client detail views.",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Fix user data isolation so that client data and related records are separated per authenticated user (Internet Identity principal), and logging in with different accounts does not show the same client data.",
+      "reqIds": [
+        "REQ-3"
+      ],
       "status": "pending"
     }
   ],
-  "projectName": "Enable dark mode + bold visual theme (colors, headings, layout)",
+  "projectName": "Show plan subscription details in client onboarding and isolate data per logged-in user",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

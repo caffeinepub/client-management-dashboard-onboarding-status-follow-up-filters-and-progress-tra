@@ -1,101 +1,85 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T23:25:37.078Z",
+  "generatedAt": "2026-02-15T04:47:27.681Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
     "total": 4,
-    "implemented": 4,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
+        "summary": "Add a plan subscription section to the client onboarding flow so the coach can record which plan the client purchased and how many extra days were added, and make these values visible on the onboarding review step and after client creation.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/theme/ThemeToggleMenu.tsx",
-          "frontend/src/components/layout/AppLayout.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/pages/OnboardClientPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/onboarding/PlanSubscriptionSection.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/theme/ThemeToggleMenu.tsx",
-          "frontend/src/components/layout/AppLayout.tsx",
-          "frontend/src/App.tsx"
+          "frontend/src/pages/OnboardClientPage.tsx",
+          "frontend/src/hooks/useQueries.ts",
+          "frontend/src/components/onboarding/PlanSubscriptionSection.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/components/auth/LoginGate.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/components/auth/LoginGate.tsx"
-        ]
+        "summary": "Persist the onboarding-time plan details (plan duration and extra days) for each client in the backend data model, and return these details in the APIs used by onboarding client lists and client detail views.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       },
       {
         "id": "REQ-3",
-        "summary": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/pages/DashboardPage.tsx",
-          "frontend/src/pages/ClientsListPage.tsx",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/pages/ClientProfilePage.tsx",
-          "frontend/src/components/layout/AppLayout.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/pages/DashboardPage.tsx",
-          "frontend/src/pages/ClientsListPage.tsx",
-          "frontend/src/pages/OnboardClientPage.tsx",
-          "frontend/src/components/layout/AppLayout.tsx"
-        ]
+        "summary": "Fix user data isolation so that client data and related records are separated per authenticated user (Internet Identity principal), and logging in with different accounts does not show the same client data.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
       },
       {
         "id": "REQ-4",
-        "summary": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
+        "summary": "Update the frontend data-fetching and list/detail UI to display the recorded onboarding plan duration and extra days for onboarding clients (including in any onboarding client list dialogs and client profile views where appropriate).",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/components/layout/AppLayout.tsx",
-          "frontend/src/pages/DashboardPage.tsx",
-          "frontend/src/pages/ClientsListPage.tsx",
+          "frontend/src/backend.d.ts",
           "frontend/src/pages/ClientProfilePage.tsx",
-          "frontend/src/components/auth/LoginGate.tsx"
+          "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+          "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+          "frontend/src/pages/ClientsListPage.tsx",
+          "frontend/src/utils/clientExportFields.ts"
         ],
         "matchedFiles": [
-          "frontend/src/index.css",
-          "frontend/src/components/layout/AppLayout.tsx",
-          "frontend/src/pages/DashboardPage.tsx",
-          "frontend/src/pages/ClientsListPage.tsx",
-          "frontend/src/components/auth/LoginGate.tsx"
+          "frontend/src/backend.d.ts",
+          "frontend/src/pages/ClientProfilePage.tsx",
+          "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+          "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+          "frontend/src/utils/clientExportFields.ts"
         ]
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/App.tsx",
-    "frontend/src/components/auth/LoginGate.tsx",
-    "frontend/src/components/layout/AppLayout.tsx",
-    "frontend/src/components/theme/ThemeToggleMenu.tsx",
-    "frontend/src/index.css",
-    "frontend/src/pages/ClientsListPage.tsx",
+    "frontend/src/backend.d.ts",
+    "frontend/src/backend.ts",
+    "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+    "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+    "frontend/src/components/onboarding/PlanSubscriptionSection.tsx",
+    "frontend/src/declarations/backend.did.d.ts",
+    "frontend/src/declarations/backend.did.js",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/ClientProfilePage.tsx",
     "frontend/src/pages/DashboardPage.tsx",
     "frontend/src/pages/OnboardClientPage.tsx",
-    "frontend/tailwind.config.js",
+    "frontend/src/utils/clientExportFields.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

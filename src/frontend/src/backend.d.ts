@@ -24,6 +24,10 @@ export interface PauseEntry {
     timestamp: Time;
     reason: string;
 }
+export interface PlanDetails {
+    extraDays: bigint;
+    planDurationDays: bigint;
+}
 export interface Subscription {
     endDate: Time;
     createdAt: Time;
@@ -67,6 +71,7 @@ export interface ExtendedClient {
     pauseTime?: Time;
     totalPausedDuration: bigint;
     mobileNumber: string;
+    initialPlanDetails?: PlanDetails;
     followUpHistory: Array<FollowUpEntry>;
     progress: Array<ClientProgress>;
     notes: string;
@@ -102,7 +107,7 @@ export interface backendInterface {
     addProgress(clientCode: bigint, weightKg: number, neckInch: number, chestInch: number, waistInch: number, hipsInch: number, thighInch: number): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     convertToFullOnboarding(clientCode: bigint): Promise<void>;
-    createClient(name: string, mobileNumber: string, notes: string, initialOnboardingState: OnboardingState): Promise<bigint>;
+    createClient(name: string, mobileNumber: string, notes: string, initialOnboardingState: OnboardingState, planDurationDays: bigint, extraDays: bigint): Promise<bigint>;
     createOrRenewSubscription(clientCode: bigint, planDurationDays: bigint, extraDays: bigint, startDate: Time): Promise<void>;
     expireMembershipImmediately(clientCode: bigint): Promise<void>;
     filterClientsByOnboardingState(state: OnboardingState): Promise<Array<ExtendedClient>>;

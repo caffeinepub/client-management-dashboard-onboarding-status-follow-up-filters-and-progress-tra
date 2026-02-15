@@ -1,12 +1,13 @@
 # Specification
 
 ## Summary
-**Goal:** Add a user-toggleable dark mode and refresh the app’s visual theme with bolder colors, clearer typography hierarchy, and a more cohesive modern layout.
+**Goal:** Capture and display plan subscription details during client onboarding, and ensure all client data is isolated per logged-in Internet Identity user.
 
 **Planned changes:**
-- Add a theme toggle (Light / Dark / System) in the authenticated app UI and wire it to the existing class-based theme switching so it applies across all main pages and persists across refresh.
-- Update global theme color tokens for both light and dark modes to a more vivid, high-contrast palette (including primary/secondary/accent/muted/border/ring and chart colors) and ensure components use semantic tokens rather than hard-coded colors.
-- Establish consistent heading styles (page titles and section headings) via shared/global typography defaults, and apply improved spacing/alignment rhythm across key screens and layout elements.
-- Apply one coherent, professional “bold” visual direction across navigation, surfaces (background/card/popover), and interactive states (hover/active/focus) without changing app functionality.
+- Add a “Plan subscription” section to the client onboarding flow to record plan duration and extra days with clear English labels.
+- Show the recorded plan duration and extra days on the onboarding Review & Confirm step and after client creation (e.g., success screen / initial client profile view for non-activated clients).
+- Extend the backend client data model to persist onboarding-time plan duration and extra days, and return these fields in APIs used by onboarding client lists and client detail views (without changing activated subscription history behavior).
+- Fix backend storage and queries to scope all client and related data to the authenticated principal, preventing cross-user access and avoiding client-code collisions across users.
+- Update relevant frontend list/detail views (including onboarding client list dialogs and client profile views) to display onboarding plan duration and extra days for non-activated clients, with clear English empty states when missing.
 
-**User-visible outcome:** Users can switch between Light, Dark, and System themes at runtime (with their choice remembered), and the app UI appears more modern and bold with clearer headings, improved spacing, and consistent styling across pages.
+**User-visible outcome:** Coaches can record a client’s purchased plan duration and extra days during onboarding and see those details in review, in onboarding client lists, and in the client view before activation; different logins only see their own clients and cannot access others’ data.

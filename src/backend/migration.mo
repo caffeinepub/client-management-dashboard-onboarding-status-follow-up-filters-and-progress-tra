@@ -1,115 +1,94 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
-import Time "mo:core/Time";
+import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 
 module {
-  type OldClient = {
-    code : Nat;
-    name : Text;
-    mobileNumber : Text;
-    planDurationDays : Nat;
-    notes : Text;
-    status : {
-      #active;
-      #paused;
-    };
-    onboardingState : {
-      #half;
-      #full;
-    };
-    progress : [OldClientProgress];
-    pauseTime : ?Time.Time;
-    totalPausedDuration : Int;
-    startDate : ?Time.Time;
-    endDate : ?Time.Time;
-    activatedAt : ?Time.Time;
-    pauseEntries : [OldPauseEntry];
-    followUpDay : ?{
-      #monday;
-      #tuesday;
-      #wednesday;
-      #thursday;
-      #friday;
-      #saturday;
-      #sunday;
-    };
-  };
-
-  type OldClientProgress = {
-    weightKg : Float;
-    neckInch : Float;
-    chestInch : Float;
-    waistInch : Float;
-    hipsInch : Float;
-    thighInch : Float;
-    timestamp : Time.Time;
-  };
-
-  type OldPauseEntry = {
-    timestamp : Time.Time;
+  public type OldPauseEntry = {
+    timestamp : Int;
     durationDays : Nat;
     reason : Text;
     resumed : Bool;
   };
 
-  type FollowUpEntry = {
-    timestamp : Time.Time;
+  public type OldFollowUpEntry = {
+    timestamp : Int;
     done : Bool;
     notes : Text;
-    followUpDay : {
-      #monday;
-      #tuesday;
-      #wednesday;
-      #thursday;
-      #friday;
-      #saturday;
-      #sunday;
-    };
+    followUpDay : { #monday; #tuesday; #wednesday; #thursday; #friday; #saturday; #sunday };
   };
 
-  type NewClient = {
+  public type OldSubscription = {
+    planDurationDays : Nat;
+    extraDays : Nat;
+    startDate : Int;
+    endDate : Int;
+    createdAt : Int;
+  };
+
+  public type OldClient = {
     code : Nat;
     name : Text;
     mobileNumber : Text;
-    planDurationDays : Nat;
     notes : Text;
-    status : {
-      #active;
-      #paused;
-    };
-    onboardingState : {
-      #half;
-      #full;
-    };
-    progress : [OldClientProgress];
-    pauseTime : ?Time.Time;
+    status : { #active; #paused };
+    onboardingState : { #half; #full };
+    progress : [{
+      timestamp : Int;
+      weightKg : Float;
+      neckInch : Float;
+      chestInch : Float;
+      waistInch : Float;
+      hipsInch : Float;
+      thighInch : Float;
+    }];
+    pauseTime : ?Int;
     totalPausedDuration : Int;
-    startDate : ?Time.Time;
-    endDate : ?Time.Time;
-    activatedAt : ?Time.Time;
     pauseEntries : [OldPauseEntry];
-    followUpDay : ?{
-      #monday;
-      #tuesday;
-      #wednesday;
-      #thursday;
-      #friday;
-      #saturday;
-      #sunday;
+    followUpDay : ?{ #monday; #tuesday; #wednesday; #thursday; #friday; #saturday; #sunday };
+    followUpHistory : [OldFollowUpEntry];
+    subscriptions : [OldSubscription];
+    activatedAt : ?Int;
+  };
+
+  public type NewClient = {
+    code : Nat;
+    owner : Principal;
+    name : Text;
+    mobileNumber : Text;
+    notes : Text;
+    status : { #active; #paused };
+    onboardingState : { #half; #full };
+    progress : [{
+      timestamp : Int;
+      weightKg : Float;
+      neckInch : Float;
+      chestInch : Float;
+      waistInch : Float;
+      hipsInch : Float;
+      thighInch : Float;
+    }];
+    pauseTime : ?Int;
+    totalPausedDuration : Int;
+    pauseEntries : [OldPauseEntry];
+    followUpDay : ?{ #monday; #tuesday; #wednesday; #thursday; #friday; #saturday; #sunday };
+    followUpHistory : [OldFollowUpEntry];
+    subscriptions : [OldSubscription];
+    activatedAt : ?Int;
+    initialPlanDetails : ?{
+      planDurationDays : Nat;
+      extraDays : Nat;
     };
-    followUpHistory : [FollowUpEntry];
   };
 
   type OldActor = {
     clients : Map.Map<Nat, OldClient>;
     clientCodeCounter : Nat;
-    userProfiles : Map.Map<Principal, { name : Text }>;
   };
 
   type NewActor = {
     clients : Map.Map<Nat, NewClient>;
     clientCodeCounter : Nat;
-    userProfiles : Map.Map<Principal, { name : Text }>;
   };
 
   public func run(old : OldActor) : NewActor {
@@ -117,13 +96,14 @@ module {
       func(_code, oldClient) {
         {
           oldClient with
-          followUpHistory = [];
+          owner = Principal.anonymous();
+          initialPlanDetails = null;
         };
       }
     );
     {
-      old with
       clients = newClients;
+      clientCodeCounter = old.clientCodeCounter;
     };
   };
 };

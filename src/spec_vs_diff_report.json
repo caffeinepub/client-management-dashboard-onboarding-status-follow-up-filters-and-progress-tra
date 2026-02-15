@@ -1,53 +1,90 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-14T23:25:37.075Z",
-  "summary": "Diff implements dark mode via next-themes with a Light/Dark/System toggle in the authenticated user menu, updates global CSS theme tokens for a bold high-contrast palette (light + dark), and adds global heading typography defaults. However, the diff also includes several functional/behavioral changes unrelated to theming (routing/query logic changes, onboarding flow changes, client profile behavior changes), which appear out of scope per the non-goals.",
-  "missing_requirements": [],
-  "hallucinated_features": [
+  "generatedAt": "2026-02-15T04:47:27.678Z",
+  "summary": "Diff adds onboarding plan subscription inputs and introduces backend fields for per-client initial plan details plus an owner principal field with a migration. There is also substantial additional UI/feature work (profiles, theming, exports, charts). However, the diff summary does not provide clear evidence that backend queries/mutations are fully scoped per-caller principal (REQ-3), nor that list/detail UIs reliably display onboarding plan details everywhere required (REQ-4), due to truncation and missing explicit evidence of filtering/columns/rendering.",
+  "missing_requirements": [
     {
-      "description": "React Query/data-fetching behavior changes (gating on backend readiness, timing instrumentation, enabled queries vs refetching) that go beyond theming/styling.",
-      "reason": "BuildRequest is strictly about theming (dark mode, palette, typography/layout) and explicitly lists non-goals including not reworking backend connection logic; these changes alter app data-fetch behavior.",
+      "id": "REQ-3",
+      "requirement": "Fix user data isolation so that client data and related records are separated per authenticated user (Internet Identity principal), and logging in with different accounts does not show the same client data.",
+      "reason": "While the Client type now includes an `owner : Principal` field and a migration adds it, the diff summary does not show create/update/query endpoints enforcing per-caller isolation (filtering by `caller`, preventing cross-user direct lookups, ensuring client code uniqueness across users, and ensuring app init/summary endpoints return only caller data). Migration sets `owner = Principal.anonymous()` which does not demonstrate proper per-principal separation for existing data.",
       "evidence": [
-        "frontend-file-summaries.txt (entry for \"frontend/src/hooks/useQueries.ts\")",
-        "frontend-file-summaries.txt (entry for \"frontend/src/App.tsx\")"
+        "backend/main.mo",
+        "backend/migration.mo",
+        "frontend/src/hooks/useQueries.ts"
       ]
     },
     {
-      "description": "Routing hook change to return bigint | null for client codes (type/behavioral change).",
-      "reason": "Not requested by theming requirements and constitutes application logic/type-safety adjustments outside UI theme scope.",
+      "id": "REQ-4",
+      "requirement": "Update the frontend data-fetching and list/detail UI to display the recorded onboarding plan duration and extra days for onboarding clients (including in any onboarding client list dialogs and client profile views where appropriate).",
+      "reason": "There is evidence of export fields and some dialog prop plumbing, but the diff summary is truncated before showing table columns/rows and client profile rendering of `initialPlanDetails`. It’s therefore not verifiable from the provided diff summary that onboarding client list dialogs and the client detail/profile UI actually display plan duration + extra days distinctly for non-activated clients.",
       "evidence": [
-        "frontend-file-summaries.txt (entry for \"frontend/src/hooks/useRouter.ts\")"
-      ]
-    },
-    {
-      "description": "Client onboarding flow changed to a wizard-style multi-step flow.",
-      "reason": "BuildRequest non-goals explicitly disallow adding/reworking application features; a wizard flow is a functional UX change beyond styling.",
-      "evidence": [
-        "frontend-file-summaries.txt (entry for \"frontend/src/pages/OnboardClientPage.tsx\")",
-        "frontend/src/pages/OnboardClientPage.tsx"
-      ]
-    },
-    {
-      "description": "Client profile page behavior changes (wiring FollowUpSection with onMarkDone handler, FollowUpPromptDialog manual mode, passing client array to ExportClientsExcelDialog).",
-      "reason": "Not requested for theming and appears to modify client follow-up/export behavior, which is application functionality outside the specified theme work.",
-      "evidence": [
-        "frontend-file-summaries.txt (entry for \"frontend/src/pages/ClientProfilePage.tsx\")"
+        "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+        "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+        "frontend/src/pages/ClientProfilePage.tsx",
+        "frontend/src/utils/clientExportFields.ts"
       ]
     }
   ],
-  "confidence": 0.74,
+  "hallucinated_features": [
+    {
+      "description": "User profile CRUD APIs and frontend profile setup flow (name prompt, profile queries/mutations).",
+      "reason": "BuildRequest does not ask for user profile management; only data isolation and plan details.",
+      "evidence": [
+        "backend/main.mo",
+        "frontend-file-summaries.txt"
+      ]
+    },
+    {
+      "description": "Major UI theming/visual redesign work (bold gradient hero login gate, theme toggle, global typography/color system).",
+      "reason": "Not requested; constraints focus on composing existing UI and adding specific onboarding/list/detail plan detail displays.",
+      "evidence": [
+        "frontend-file-summaries.txt",
+        "frontend/src/index.css",
+        "frontend/tailwind.config.js",
+        "frontend/src/components/auth/LoginGate.tsx",
+        "frontend/src/components/layout/AppLayout.tsx"
+      ]
+    },
+    {
+      "description": "Excel export enhancements including adding onboarding plan fields to export schema.",
+      "reason": "Export functionality/fields were not part of the requested requirements or acceptance criteria.",
+      "evidence": [
+        "frontend/src/utils/clientExportFields.ts",
+        "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+        "frontend/src/components/dashboard/OnboardingClientsDialog.tsx"
+      ]
+    },
+    {
+      "description": "Progress visualization components (charts/history tables) and related UI wiring changes beyond plan details display.",
+      "reason": "Not requested in BuildRequest; unrelated to onboarding plan details or per-principal isolation.",
+      "evidence": [
+        "frontend-file-summaries.txt",
+        "frontend/src/components/progress/ProgressCharts.tsx",
+        "frontend/src/components/progress/ProgressHistoryTable.tsx"
+      ]
+    },
+    {
+      "description": "New combined app init query/caching strategy (`getAppInitData`) and identity-scoped React Query keys.",
+      "reason": "Not explicitly requested; although it may support isolation, the requirement is backend isolation, not frontend cache scoping or combined init endpoint usage.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    }
+  ],
+  "confidence": 0.62,
   "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/App.tsx",
-    "frontend/src/components/auth/LoginGate.tsx",
-    "frontend/src/components/layout/AppLayout.tsx",
-    "frontend/src/components/theme/ThemeToggleMenu.tsx",
-    "frontend/src/index.css",
-    "frontend/src/pages/ClientsListPage.tsx",
+    "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+    "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+    "frontend/src/components/onboarding/PlanSubscriptionSection.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/ClientProfilePage.tsx",
     "frontend/src/pages/DashboardPage.tsx",
     "frontend/src/pages/OnboardClientPage.tsx",
-    "frontend/tailwind.config.js",
+    "frontend/src/utils/clientExportFields.ts",
     "project_state.json"
   ]
 }

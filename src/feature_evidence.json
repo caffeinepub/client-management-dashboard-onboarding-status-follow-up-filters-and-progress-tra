@@ -2,12 +2,12 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-add-an-in-app-dark-mode-capability-that-users-can-toggle-at-runtime-and-ensure-the-entire-ui-correctly-switches-between-light-and-dark-themes-using-class-based-dark-mode",
-      "featureTitle": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
+      "featureId": "feature-add-a-plan-subscription-section-to-the-client-onboarding-flow-so-the-coach-can-record-which-plan-the-client-purchased-and-how-many-extra-days-were-added-and-make-these-values-visible-on-the-onboarding-review-step-and-after-client-creation",
+      "featureTitle": "Add a plan subscription section to the client onboarding flow so the coach can record which plan the client purchased and how many extra days were added, and make these values visible on the onboarding review step and after client creation.",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/components/layout/AppLayout.tsx",
-        "frontend/src/components/theme/ThemeToggleMenu.tsx"
+        "frontend/src/components/onboarding/PlanSubscriptionSection.tsx",
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/pages/OnboardClientPage.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -23,58 +23,13 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-update-the-global-color-palette-tokens-for-both-light-and-dark-modes-to-use-a-more-vivid-bold-and-high-contrast-scheme-while-keeping-text-readable-and-accessible-and-apply-it-consistently-across-the-app",
-      "featureTitle": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
+      "featureId": "feature-update-the-frontend-data-fetching-and-list-detail-ui-to-display-the-recorded-onboarding-plan-duration-and-extra-days-for-onboarding-clients-including-in-any-onboarding-client-list-dialogs-and-client-profile-views-where-appropriate",
+      "featureTitle": "Update the frontend data-fetching and list/detail UI to display the recorded onboarding plan duration and extra days for onboarding clients (including in any onboarding client list dialogs and client profile views where appropriate).",
       "files": [
-        "frontend/src/components/auth/LoginGate.tsx",
-        "frontend/src/index.css",
-        "frontend/src/pages/OnboardClientPage.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-2"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-improve-typography-hierarchy-by-making-page-titles-and-section-headings-more-prominent-bold-consistent-sizing-spacing-and-tracking-and-ensure-a-cohesive-layout-rhythm-across-the-main-pages",
-      "featureTitle": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
-      "files": [
-        "frontend/src/components/layout/AppLayout.tsx",
-        "frontend/src/index.css",
-        "frontend/src/pages/ClientsListPage.tsx",
-        "frontend/src/pages/DashboardPage.tsx",
-        "frontend/src/pages/OnboardClientPage.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-apply-one-coherent-visual-theme-direction-across-the-app-colors-typography-surfaces-and-interactive-states-that-looks-modern-and-bold-while-remaining-professional-for-a-crm-fitness-coaching-context",
-      "featureTitle": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
-      "files": [
-        "frontend/src/components/auth/LoginGate.tsx",
-        "frontend/src/components/layout/AppLayout.tsx",
-        "frontend/src/index.css",
-        "frontend/src/pages/ClientsListPage.tsx",
-        "frontend/src/pages/DashboardPage.tsx"
+        "frontend/src/components/dashboard/ClientsMetricDialog.tsx",
+        "frontend/src/components/dashboard/OnboardingClientsDialog.tsx",
+        "frontend/src/pages/ClientProfilePage.tsx",
+        "frontend/src/utils/clientExportFields.ts"
       ],
       "components": [
         "authorization@4.0.0",

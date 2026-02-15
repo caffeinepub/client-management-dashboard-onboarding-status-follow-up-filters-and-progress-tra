@@ -16,12 +16,18 @@ import { normalizeError } from '../utils/errors';
 import { normalizeMobileNumber, isValidMobileNumber, getMobileNumberError } from '../utils/mobileNumber';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { onboardingStatusOptions, OnboardingStatusHelp } from '../components/onboarding/OnboardingStatusHelp';
+import { PlanSubscriptionSection } from '../components/onboarding/PlanSubscriptionSection';
 
 const wizardSteps = [
   {
     id: 'basic-info',
     title: 'Basic Information',
     description: 'Enter the client\'s name and contact details',
+  },
+  {
+    id: 'plan-subscription',
+    title: 'Plan Subscription',
+    description: 'Record the plan duration and extra days',
   },
   {
     id: 'status-notes',
@@ -46,17 +52,33 @@ export function OnboardClientPage() {
     mobileNumber: '',
     notes: '',
     onboardingState: OnboardingState.half,
+    planDurationValue: 1,
+    planDurationUnit: 'months' as 'days' | 'months',
+    extraDays: 0,
   });
 
   const [fieldErrors, setFieldErrors] = useState({
     name: null as string | null,
     mobileNumber: null as string | null,
+    planDuration: null as string | null,
   });
 
   const [createdClientCode, setCreatedClientCode] = useState<bigint | null>(null);
+  const [createdClientPlanDetails, setCreatedClientPlanDetails] = useState<{
+    planDurationDays: number;
+    extraDays: number;
+  } | null>(null);
 
   // Determine if the form can be interacted with
   const canInteract = isReady && !createClient.isPending;
+
+  // Calculate total plan days
+  const getTotalPlanDays = () => {
+    const baseDays = formData.planDurationUnit === 'months' 
+      ? formData.planDurationValue * 30 
+      : formData.planDurationValue;
+    return baseDays;
+  };
 
   // Validation for each step
   const validateStep = (step: number): boolean => {
@@ -66,11 +88,24 @@ export function OnboardClientPage() {
       const mobileError = getMobileNumberError(formData.mobileNumber);
       
       setFieldErrors({
+        ...fieldErrors,
         name: nameError,
         mobileNumber: mobileError,
       });
 
       return !nameError && !mobileError;
+    }
+    
+    if (step === 1) {
+      // Plan subscription step
+      const planError = formData.planDurationValue > 0 ? null : 'Plan duration must be at least 1';
+      
+      setFieldErrors({
+        ...fieldErrors,
+        planDuration: planError,
+      });
+
+      return !planError;
     }
     
     // Other steps don't have required validation
@@ -85,7 +120,7 @@ export function OnboardClientPage() {
 
   const handleBack = () => {
     // Clear errors when going back
-    setFieldErrors({ name: null, mobileNumber: null });
+    setFieldErrors({ name: null, mobileNumber: null, planDuration: null });
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
@@ -96,21 +131,29 @@ export function OnboardClientPage() {
     }
 
     // Final validation
-    if (!validateStep(0)) {
+    if (!validateStep(0) || !validateStep(1)) {
       toast.error('Please complete all required fields');
       setCurrentStep(0);
       return;
     }
 
     try {
+      const planDurationDays = getTotalPlanDays();
+      
       const clientCode = await createClient.mutateAsync({
         name: formData.name.trim(),
         mobileNumber: normalizeMobileNumber(formData.mobileNumber),
         notes: formData.notes.trim(),
         onboardingState: formData.onboardingState,
+        planDurationDays: BigInt(planDurationDays),
+        extraDays: BigInt(formData.extraDays),
       });
 
       setCreatedClientCode(clientCode);
+      setCreatedClientPlanDetails({
+        planDurationDays,
+        extraDays: formData.extraDays,
+      });
       toast.success('Client onboarded successfully!');
     } catch (error) {
       toast.error(normalizeError(error));
@@ -124,9 +167,13 @@ export function OnboardClientPage() {
       mobileNumber: '',
       notes: '',
       onboardingState: OnboardingState.half,
+      planDurationValue: 1,
+      planDurationUnit: 'months',
+      extraDays: 0,
     });
-    setFieldErrors({ name: null, mobileNumber: null });
+    setFieldErrors({ name: null, mobileNumber: null, planDuration: null });
     setCreatedClientCode(null);
+    setCreatedClientPlanDetails(null);
     setCurrentStep(0);
   };
 
@@ -158,6 +205,27 @@ export function OnboardClientPage() {
                   Client code: <span className="font-bold text-foreground">{formatClientCode(createdClientCode.toString())}</span>
                 </p>
               </div>
+              
+              {createdClientPlanDetails && (
+                <div className="rounded-lg border-2 bg-card p-6 text-left max-w-md mx-auto">
+                  <h3 className="font-bold text-lg mb-4">Plan Details Recorded</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Plan Duration:</span>
+                      <span className="font-semibold">{createdClientPlanDetails.planDurationDays} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Extra Days:</span>
+                      <span className="font-semibold">{createdClientPlanDetails.extraDays} days</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="text-muted-foreground">Total Duration:</span>
+                      <span className="font-bold">{createdClientPlanDetails.planDurationDays + createdClientPlanDetails.extraDays} days</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
                 <Button onClick={handleCopyClientCode} variant="outline" className="gap-2 font-semibold">
                   <Copy className="h-4 w-4" />
@@ -204,6 +272,8 @@ export function OnboardClientPage() {
   // Determine if we can proceed to next step
   const canGoNext = currentStep === 0 
     ? formData.name.trim() !== '' && isValidMobileNumber(formData.mobileNumber)
+    : currentStep === 1
+    ? formData.planDurationValue > 0
     : true;
 
   const canGoBack = currentStep > 0;
@@ -280,8 +350,26 @@ export function OnboardClientPage() {
           </>
         )}
 
-        {/* Step 2: Status & Notes */}
+        {/* Step 2: Plan Subscription */}
         {currentStep === 1 && (
+          <PlanSubscriptionSection
+            planDurationValue={formData.planDurationValue}
+            planDurationUnit={formData.planDurationUnit}
+            extraDays={formData.extraDays}
+            onPlanDurationValueChange={(value) => {
+              setFormData({ ...formData, planDurationValue: value });
+              if (fieldErrors.planDuration) {
+                setFieldErrors({ ...fieldErrors, planDuration: null });
+              }
+            }}
+            onPlanDurationUnitChange={(unit) => setFormData({ ...formData, planDurationUnit: unit })}
+            onExtraDaysChange={(value) => setFormData({ ...formData, extraDays: value })}
+            disabled={!canInteract}
+          />
+        )}
+
+        {/* Step 3: Status & Notes */}
+        {currentStep === 2 && (
           <>
             <div className="space-y-2">
               <Label htmlFor="onboardingState" className="font-semibold">
@@ -330,8 +418,8 @@ export function OnboardClientPage() {
           </>
         )}
 
-        {/* Step 3: Review */}
-        {currentStep === 2 && (
+        {/* Step 4: Review */}
+        {currentStep === 3 && (
           <div className="space-y-6">
             <div className="rounded-lg border-2 bg-card p-6 space-y-4">
               <h3 className="font-bold text-xl">Review Client Information</h3>
@@ -345,6 +433,28 @@ export function OnboardClientPage() {
                 <div>
                   <p className="text-sm text-muted-foreground font-semibold">Mobile Number</p>
                   <p className="font-semibold text-lg">{formData.mobileNumber}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground font-semibold">Plan Duration</p>
+                  <p className="font-semibold text-lg">
+                    {getTotalPlanDays()} days
+                    {formData.planDurationUnit === 'months' && (
+                      <span className="text-sm text-muted-foreground font-normal ml-2">
+                        ({formData.planDurationValue} {formData.planDurationValue === 1 ? 'month' : 'months'})
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground font-semibold">Extra Days</p>
+                  <p className="font-semibold text-lg">{formData.extraDays} days</p>
+                </div>
+
+                <div className="pt-2 border-t">
+                  <p className="text-sm text-muted-foreground font-semibold">Total Plan Duration</p>
+                  <p className="font-bold text-xl text-primary">{getTotalPlanDays() + formData.extraDays} days</p>
                 </div>
 
                 <div>

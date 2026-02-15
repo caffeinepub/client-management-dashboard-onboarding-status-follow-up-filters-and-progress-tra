@@ -49,134 +49,134 @@ export const CLIENT_EXPORT_FIELDS: ClientExportField[] = [
   {
     key: 'mobileNumber',
     label: 'Mobile Number',
-    description: 'Contact phone number',
+    description: 'Client contact number',
     accessor: (client) => client.mobileNumber,
   },
   {
-    key: 'planDurationDays',
-    label: 'Plan Duration (days)',
-    description: 'Total duration of the current plan in days',
+    key: 'onboardingState',
+    label: 'Onboarding State',
+    description: 'Half or Full onboarding status',
+    accessor: (client) => (client.onboardingState === 'half' ? 'Half' : 'Full'),
+  },
+  {
+    key: 'activatedAt',
+    label: 'Activated At',
+    description: 'Date when client was activated',
+    accessor: (client) => (client.activatedAt ? formatDate(client.activatedAt) : 'Not Activated'),
+  },
+  {
+    key: 'onboardingPlanDuration',
+    label: 'Onboarding Plan Duration (Days)',
+    description: 'Plan duration recorded during onboarding',
+    accessor: (client) => 
+      client.initialPlanDetails 
+        ? Number(client.initialPlanDetails.planDurationDays) 
+        : 'Not Recorded',
+  },
+  {
+    key: 'onboardingExtraDays',
+    label: 'Onboarding Extra Days',
+    description: 'Extra days recorded during onboarding',
+    accessor: (client) => 
+      client.initialPlanDetails 
+        ? Number(client.initialPlanDetails.extraDays) 
+        : 'Not Recorded',
+  },
+  {
+    key: 'currentPlanDuration',
+    label: 'Current Plan Duration (Days)',
+    description: 'Duration of current/latest subscription',
     accessor: (client) => {
-      const currentSub = getCurrentSubscription(client);
-      return currentSub ? Number(currentSub.planDurationDays) : 0;
+      const sub = getCurrentSubscription(client);
+      return sub ? Number(sub.planDurationDays) : 'No Subscription';
     },
   },
   {
-    key: 'startDate',
-    label: 'Start Date',
-    description: 'Plan start date',
+    key: 'currentExtraDays',
+    label: 'Current Extra Days',
+    description: 'Extra days in current/latest subscription',
     accessor: (client) => {
-      const currentSub = getCurrentSubscription(client);
-      return currentSub ? formatDate(currentSub.startDate) : 'Not activated';
+      const sub = getCurrentSubscription(client);
+      return sub ? Number(sub.extraDays) : 'No Subscription';
     },
   },
   {
-    key: 'endDate',
-    label: 'End Date',
-    description: 'Plan end date',
+    key: 'planStartDate',
+    label: 'Plan Start Date',
+    description: 'Start date of current/latest subscription',
     accessor: (client) => {
-      const currentSub = getCurrentSubscription(client);
-      return currentSub ? formatDate(currentSub.endDate) : 'Not activated';
+      const sub = getCurrentSubscription(client);
+      return sub ? formatDate(sub.startDate) : 'No Subscription';
+    },
+  },
+  {
+    key: 'planEndDate',
+    label: 'Plan End Date',
+    description: 'End date of current/latest subscription',
+    accessor: (client) => {
+      const sub = getCurrentSubscription(client);
+      return sub ? formatDate(sub.endDate) : 'No Subscription';
+    },
+  },
+  {
+    key: 'followUpDay',
+    label: 'Follow-Up Day',
+    description: 'Scheduled day for weekly follow-ups',
+    accessor: (client) => {
+      if (!client.followUpDay) return 'Not Set';
+      return client.followUpDay.charAt(0).toUpperCase() + client.followUpDay.slice(1);
     },
   },
   {
     key: 'status',
     label: 'Status',
     description: 'Current client status',
-    accessor: (client) => client.status,
+    accessor: (client) => (client.status === 'active' ? 'Active' : 'Paused'),
   },
   {
-    key: 'onboardingState',
-    label: 'Onboarding State',
-    description: 'Onboarding completion status',
-    accessor: (client) => client.onboardingState === 'half' ? 'Half' : 'Full',
+    key: 'pauseTime',
+    label: 'Pause Time',
+    description: 'When the client was paused',
+    accessor: (client) => (client.pauseTime ? formatDate(client.pauseTime) : 'Not Paused'),
   },
   {
-    key: 'followUpDay',
-    label: 'Follow-up Day',
-    description: 'Scheduled follow-up day of the week',
-    accessor: (client) => client.followUpDay || 'Not set',
+    key: 'totalPausedDuration',
+    label: 'Total Paused Duration (Days)',
+    description: 'Total time client has been paused',
+    accessor: (client) => {
+      const durationNs = Number(client.totalPausedDuration);
+      const durationDays = Math.floor(durationNs / (86_400_000_000_000));
+      return durationDays;
+    },
   },
   {
     key: 'notes',
     label: 'Notes',
     description: 'Additional notes about the client',
-    accessor: (client) => client.notes || '',
-  },
-  {
-    key: 'latestWeight',
-    label: 'Latest Weight (kg)',
-    description: 'Most recent weight measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.weightKg;
-    },
-  },
-  {
-    key: 'latestNeck',
-    label: 'Latest Neck (inch)',
-    description: 'Most recent neck measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.neckInch;
-    },
-  },
-  {
-    key: 'latestChest',
-    label: 'Latest Chest (inch)',
-    description: 'Most recent chest measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.chestInch;
-    },
-  },
-  {
-    key: 'latestWaist',
-    label: 'Latest Waist (inch)',
-    description: 'Most recent waist measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.waistInch;
-    },
-  },
-  {
-    key: 'latestHips',
-    label: 'Latest Hips (inch)',
-    description: 'Most recent hips measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.hipsInch;
-    },
-  },
-  {
-    key: 'latestThigh',
-    label: 'Latest Thigh (inch)',
-    description: 'Most recent thigh measurement',
-    accessor: (client) => {
-      if (!client.progress || client.progress.length === 0) return 'N/A';
-      const latest = client.progress[client.progress.length - 1];
-      return latest.thighInch;
-    },
+    accessor: (client) => client.notes || 'No Notes',
   },
   {
     key: 'progressEntries',
     label: 'Progress Entries',
-    description: 'Total number of progress records',
+    description: 'Number of progress records',
     accessor: (client) => client.progress?.length || 0,
   },
   {
-    key: 'totalPausedDuration',
-    label: 'Total Paused Duration (days)',
-    description: 'Total time the client has been paused',
-    accessor: (client) => {
-      const nanoseconds = Number(client.totalPausedDuration);
-      const days = Math.floor(nanoseconds / (86_400_000_000_000));
-      return days;
-    },
+    key: 'followUpEntries',
+    label: 'Follow-Up Entries',
+    description: 'Number of follow-up records',
+    accessor: (client) => client.followUpHistory?.length || 0,
+  },
+  {
+    key: 'pauseEntries',
+    label: 'Pause Entries',
+    description: 'Number of pause records',
+    accessor: (client) => client.pauseEntries?.length || 0,
+  },
+  {
+    key: 'subscriptionCount',
+    label: 'Subscription Count',
+    description: 'Total number of subscriptions',
+    accessor: (client) => client.subscriptions?.length || 0,
   },
 ];

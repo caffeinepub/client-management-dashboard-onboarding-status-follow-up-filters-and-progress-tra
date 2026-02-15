@@ -1,98 +1,106 @@
 {
   "kind": "build_request",
-  "title": "Enable dark mode + bold visual theme (colors, headings, layout)",
-  "priority": "normal",
+  "title": "Show plan subscription details in client onboarding and isolate data per logged-in user",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Add an in-app dark mode capability that users can toggle at runtime, and ensure the entire UI correctly switches between light and dark themes using class-based dark mode.",
+      "text": "Add a plan subscription section to the client onboarding flow so the coach can record which plan the client purchased and how many extra days were added, and make these values visible on the onboarding review step and after client creation.",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-1"
         ],
         "quotes": [
-          "Enable the dark mode of the page"
+          "Plan subscription section missing during client onboarding.",
+          "Cannot see which plan the client purchased and the extra days added."
         ]
       },
       "acceptanceCriteria": [
-        "A theme toggle control is available in the authenticated app UI (e.g., header user menu) with options at minimum: Light, Dark, and System.",
-        "Toggling theme updates the document theme class (via the existing next-themes ThemeProvider usage) and immediately updates colors across pages (Login, Dashboard, Clients, Onboard, Client Profile).",
-        "Theme selection persists across refresh (next-themes persistence).",
-        "No changes are made to any files listed under frontend immutablePaths."
+        "The onboarding wizard includes input controls for plan duration (in days or months) and extra days, with clear English labels.",
+        "The Review & Confirm step displays the selected plan duration and extra days.",
+        "After successfully creating the client, the success screen or next navigation (e.g., Client Profile) allows the coach to see the recorded plan duration and extra days for that client while they are still in onboarding (not yet activated)."
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Update the global color palette tokens for both light and dark modes to use a more vivid, bold, and high-contrast scheme (while keeping text readable and accessible) and apply it consistently across the app.",
-      "target": "frontend",
+      "text": "Persist the onboarding-time plan details (plan duration and extra days) for each client in the backend data model, and return these details in the APIs used by onboarding client lists and client detail views.",
+      "target": "backend",
       "source": {
         "messageIds": [
           "msg-1"
         ],
         "quotes": [
-          "give some good bold colors"
+          "Cannot see which plan the client purchased and the extra days added."
         ]
       },
       "acceptanceCriteria": [
-        "Global theme variables are updated (in the active global Tailwind theme CSS) so that primary/secondary/accent/muted/border/ring and chart colors look noticeably bolder in both light and dark mode.",
-        "Primary actions (buttons/active nav states), key highlights (badges/metrics), and hover states visibly reflect the updated palette without reducing legibility.",
-        "Dark mode background is a deep neutral (near-black/charcoal) with clear separation between background, card, and popover surfaces.",
-        "No hard-coded colors are introduced in page components where semantic tokens (bg-background, text-foreground, bg-card, text-muted-foreground, text-primary, bg-accent, etc.) can be used instead."
+        "When a client is created via the onboarding flow, the backend stores the selected plan duration and extra days with that client record (even if the client has no active subscription yet).",
+        "APIs that power onboarding lists and single-client fetches return the stored plan duration and extra days for non-activated (onboarding) clients.",
+        "Existing subscription behavior for activated clients remains unchanged (subscriptions history still works as-is)."
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Improve typography hierarchy by making page titles and section headings more prominent (bold, consistent sizing, spacing, and tracking) and ensure a cohesive layout rhythm across the main pages.",
-      "target": "frontend",
+      "text": "Fix user data isolation so that client data and related records are separated per authenticated user (Internet Identity principal), and logging in with different accounts does not show the same client data.",
+      "target": "backend",
       "source": {
         "messageIds": [
           "msg-1"
         ],
         "quotes": [
-          "headings to titles and good layout that is appealing to eyes"
+          "Data not separated for different users; logging in with different Gmail IDs shows the same data."
         ]
       },
       "acceptanceCriteria": [
-        "Page titles (e.g., \"Dashboard\", \"Clients\") render with a consistent, strong hierarchy (size/weight/tracking) across pages.",
-        "Section headings inside cards/dialogs/forms also follow a consistent heading scale (e.g., h2/h3 styles) with appropriate spacing.",
-        "Global base styles include sensible defaults for h1–h4 (or a shared utility pattern) so headings look consistent without repetitive per-page styling.",
-        "Key screens (DashboardPage, ClientsListPage, LoginGate, AppLayout header/footer) have improved spacing and alignment for an overall cleaner, more visually appealing layout without changing app functionality."
+        "All create/update/query operations for clients only read/write data belonging to the calling principal.",
+        "If User A creates clients, User B (different principal) cannot see or access those clients via list queries or direct lookups by client code.",
+        "Client codes do not collide across users (either scoped per user or made globally unique in a way that still prevents cross-user access).",
+        "The app init / summary endpoints used by the frontend return only the caller’s data."
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Apply one coherent visual theme direction across the app (colors, typography, surfaces, and interactive states) that looks modern and “bold” while remaining professional for a CRM/fitness-coaching context.",
+      "text": "Update the frontend data-fetching and list/detail UI to display the recorded onboarding plan duration and extra days for onboarding clients (including in any onboarding client list dialogs and client profile views where appropriate).",
       "target": "frontend",
       "source": {
         "messageIds": [
           "msg-1"
         ],
         "quotes": [
-          "Lets work on theme",
-          "good layout that is appealing to eyes"
+          "Plan subscription section missing during client onboarding.",
+          "Cannot see which plan the client purchased and the extra days added."
         ]
       },
       "acceptanceCriteria": [
-        "The UI uses a consistent theme style across header, navigation, cards, dialogs, tables, and empty states (no mixed styling patterns).",
-        "Theme direction avoids generic default styling by using clear surface elevation (subtle shadows/borders), purposeful accent usage, and consistent rounding.",
-        "The chosen theme does not rely on a blue/purple primary palette (unless already present and explicitly kept); it should look distinct and intentional.",
-        "No backend changes are required for the theme update."
+        "Onboarding client list UI (e.g., dashboard onboarding dialog and/or clients list) shows the onboarding plan duration and extra days for each onboarding client when available.",
+        "Client detail/profile UI shows the onboarding plan duration and extra days for non-activated clients, distinct from the activated subscription history table.",
+        "All user-facing labels and empty states are in English and remain understandable when plan details are missing."
       ]
     }
   ],
   "constraints": [
-    "Frontend must remain React + TypeScript + Tailwind + shadcn UI + React Query.",
-    "Do not edit any files under frontend immutablePaths (compose existing UI components instead).",
-    "Backend remains single-actor; no backend changes are needed for theming."
+    "Backend must remain a single Motoko actor in backend/main.mo; add backend/migration.mo only if required for an upgrade of existing stored state.",
+    "Do not edit files under frontend/src/components/ui or any paths listed in frontend.immutablePaths (compose existing components instead).",
+    "Use English for all user-facing UI text."
   ],
   "nonGoals": [
-    "Adding new application features (CRM logic, new pages, new data models, exports changes).",
-    "Introducing third-party theming libraries beyond the already-present next-themes integration.",
-    "Reworking authentication or backend connection logic."
+    "Implementing third-party authentication providers (only Internet Identity is in scope).",
+    "Adding external databases or off-canister storage.",
+    "Real-time syncing or multi-user collaboration features beyond strict per-principal data isolation."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
   }
 }
